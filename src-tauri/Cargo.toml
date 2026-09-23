@@ -1,0 +1,28 @@
+[package]
+name = "hypnofy"
+version = "0.1.0"
+description = "A fast, private hypnosis script library and player"
+authors = ["Hypnofy"]
+edition = "2024"
+
+[lib]
+name = "hypnofy_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+anyhow = "=1.0.104"
+chrono = { version = "=0.4.42", features = ["serde"] }
+futures-util = "=0.3.31"
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "stream", "rustls"] }
+rodio = { version = "=0.22.2", default-features = true }
+rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.11.0"
+tauri = { version = "=2.11.5", features = [] }
+tauri-plugin-dialog = "=2.7.3"
+tokio = { version = "=1.53.1", features = ["process", "rt-multi-thread", "time", "sync", "io-util", "fs"] }
+uuid = { version = "=1.26.1", features = ["v4"] }

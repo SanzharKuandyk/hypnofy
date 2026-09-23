@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "sherpa-onnx-windows-x64",
+      "kind": "engine",
+      "version": "1.13.8",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.8",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-win-x64-shared-MD-Release.tar.bz2",
+      "filename": "sherpa-onnx-v1.13.8-win-x64-shared-MD-Release.tar.bz2",
+      "bytes": 20494724,
+      "sha256": "3e971a04b2e0ba4dfa53d381a006367ce8c9f5f09b4ae00043e9845c2baded22",
+      "license": "Apache-2.0 with bundled third-party notices",
+      "installDirectory": "engines/sherpa",
+      "expectedFile": "sherpa-onnx-offline-tts.exe"
+    },
+    {
+      "id": "kokoro-multi-lang-v1_0",
+      "kind": "voice-pack",
+      "version": "1.0",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
+      "filename": "kokoro-multi-lang-v1_0.tar.bz2",
+      "bytes": 349906910,
+      "sha256": "c5f7e2d2caf082bc1d20fb70334a61d99d20b484500aad32e7cf84c128ea3298",
+      "license": "Apache-2.0 engine; model files include their upstream license",
+      "installDirectory": "models",
+      "expectedFile": "kokoro-multi-lang-v1_0/model.onnx"
+    },
+    {
+      "id": "llama-cpp-windows-cpu-x64",
+      "kind": "llama-engine",
+      "version": "b10615",
+      "source": "https://github.com/ggml-org/llama.cpp/releases/tag/b10615",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10615/llama-b10615-bin-win-cpu-x64.zip",
+      "filename": "llama-b10615-bin-win-cpu-x64.zip",
+      "bytes": 18067835,
+      "sha256": "81f1bad08846edfb412a62d7455801bb3e8e35e0e367d60af6728c150fd6563f",
+      "license": "MIT with bundled third-party notices",
+      "installDirectory": "engines/llama",
+      "expectedFile": "llama-server.exe"
+    }
+  ]
+}
