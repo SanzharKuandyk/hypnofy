@@ -88,8 +88,8 @@ impl AppSettings {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if !["ollama", "gguf"].contains(&self.default_provider.as_str()) {
-            return Err("Default provider must be Ollama or GGUF".into());
+        if !["ollama", "gguf", "openrouter", "opencode"].contains(&self.default_provider.as_str()) {
+            return Err("Default provider is unsupported".into());
         }
         if self.default_model.chars().count() > 200 || self.keep_model_minutes > 120 {
             return Err("Model settings are outside the supported range".into());

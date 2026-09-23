@@ -1,0 +1,25 @@
+export type ProviderId = "ollama" | "gguf" | "openrouter" | "opencode";
+export type ModelId = `${ProviderId}:${string}`;
+export type ModelCapability = "text" | "speech";
+export type ModelStatus = "ready" | "offline" | "missing" | "invalid" | "needs-auth";
+export type Recovery = "connect" | "relink" | "install" | "authenticate" | "verify";
+export type ModelRecord = {
+  id: ModelId; name: string; provider: ProviderId; capability: ModelCapability;
+  source: "discovered" | "linked" | "managed" | "remote";
+  status: ModelStatus; reason?: string; recovery?: Recovery;
+  cost?: string;
+};
+export type LinkedModel = { id: string; name: string; path: string };
+import type { JSONContent } from "@tiptap/core";
+export type ScriptDocument = JSONContent & { version: 1; type: "doc"; content: JSONContent[] };
+export type SessionSettings = { voice: string; speed: number; paragraphPause: number; ambienceId: string | null; ambienceVolume: number; narrationVolume: number; ambienceMode: string; sleepMinutes: number | null };
+export type Collection = { id: string; name: string; scriptCount: number };
+export type ScriptSummary = { id: string; collectionId: string; collectionName: string; title: string; favorite: boolean; updatedAt: string; revision: number };
+export type Script = ScriptSummary & { body: string; document: ScriptDocument; lastModelId: ModelId | null; createdAt: string; deletedAt: string | null; session: SessionSettings };
+export type DraftRequest = { scriptId: string; baseRevision: number; modelId: ModelId; operation: "new" | "continue" | "rewrite-selection"; prompt: string; selectedText?: string; insertionAnchor?: number };
+export type JobEvent = { jobId: string; scriptId: string; baseRevision: number; phase: "queued" | "streaming" | "complete" | "cancelled" | "failed"; delta?: string; error?: { code: string; message: string; recovery?: Recovery } };
+export type Ambience = { id: string; name: string; path: string };
+export type TimelineSegment = { kind: "speech" | "pause"; text?: string; seconds?: number };
+export type AppSettings = { defaultProvider: ProviderId; defaultModel: string; ggufModelPath: string; llamaServerPath: string; keepModelMinutes: number };
+export type AssetConfig = { id: string; kind: string; version: string; source: string; url: string; filename: string; bytes: number; sha256: string; license: string; installDirectory: string; expectedFile: string };
+export type SettingsView = { preferences: AppSettings; dataDirectory: string; assets: AssetConfig[] };

@@ -1,0 +1,30 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { Ambience, AppSettings, Collection, DraftRequest, LinkedModel, ModelRecord, Script, ScriptDocument, ScriptSummary, SettingsView, TimelineSegment } from "./types";
+
+export const client = {
+  collections: () => invoke<Collection[]>("list_collections"),
+  createCollection: (name: string) => invoke<Collection>("create_collection", { name }),
+  scripts: (collectionId: string | null, query: string, favorite: boolean, trash: boolean) => invoke<ScriptSummary[]>("list_scripts", { collectionId, query, favorite, trash }),
+  script: (id: string) => invoke<Script>("get_script", { id }),
+  createScript: (collectionId?: string | null, title?: string | null, body?: string) => invoke<Script>("create_script", { collectionId, title, body }),
+  updateScript: (script: Script) => invoke<Script>("update_script", { patch: { id: script.id, title: script.title, document: script.document, collectionId: script.collectionId, favorite: script.favorite, expectedRevision: script.revision, session: script.session, lastModelId: script.lastModelId } }),
+  duplicateScript: (id: string) => invoke<Script>("duplicate_script", { id }),
+  setDeleted: (id: string, deleted: boolean) => invoke<void>("set_script_deleted", { id, deleted }),
+  importText: (path: string, collectionId?: string | null) => invoke<Script>("import_text", { path, collectionId }),
+  exportText: (id: string, path: string) => invoke<void>("export_text", { id, path }),
+  ambience: () => invoke<Ambience[]>("list_ambience"),
+  importAmbience: (path: string) => invoke<Ambience>("import_ambience", { path }),
+  planTiming: (document: ScriptDocument, paragraphPause: number) => invoke<TimelineSegment[]>("plan_timing", { document, paragraphPause }),
+  models: () => invoke<ModelRecord[]>("list_text_models"),
+  linkGguf: (path: string, existingId?: string | null) => invoke<LinkedModel>("link_gguf", { path, existingId }),
+  unlinkGguf: (id: string) => invoke<void>("unlink_gguf", { id }),
+  verifyGguf: (id: string) => invoke<void>("verify_gguf", { id }),
+  installModelRuntime: () => invoke<void>("install_model_runtime"),
+  generate: (request: DraftRequest) => invoke<string>("start_generation", { request }),
+  cancelGeneration: (jobId: string) => invoke<void>("cancel_generation", { jobId }),
+  getSettings: () => invoke<SettingsView>("get_app_settings"),
+  saveSettings: (settings: AppSettings) => invoke<SettingsView>("save_app_settings", { settings }),
+  setOpenRouterKey: (key: string) => invoke<void>("set_openrouter_key", { key }),
+  clearOpenRouterKey: () => invoke<void>("clear_openrouter_key"),
+  openRouterConnected: () => invoke<boolean>("openrouter_connected"),
+};

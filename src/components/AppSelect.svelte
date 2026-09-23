@@ -57,24 +57,23 @@
 <style>
   :global(.app-select-trigger) {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    width: 100%; min-height: 38px; padding: 0 11px; border: 1px solid var(--line);
-    border-radius: 10px; color: var(--text); background: var(--raised); cursor: pointer;
+    width: 100%; min-height: 34px; padding: 0 10px; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); background: var(--surface); cursor: pointer;
     text-align: left; font-size: 12px;
   }
-  :global(.app-select-trigger:hover), :global(.app-select-trigger[data-state="open"]) { border-color: var(--line-strong); background: var(--hover) }
+  :global(.app-select-trigger:hover), :global(.app-select-trigger[data-state="open"]) { background: var(--surface-hover) }
   :global(.app-select-trigger svg) { width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 1.5 }
   :global(.app-select-content) {
     z-index: 100; min-width: var(--bits-select-anchor-width); max-height: 280px; overflow: hidden;
-    border: 1px solid var(--line-strong); border-radius: 12px; background: #1a181d;
-    box-shadow: 0 12px 32px rgba(0,0,0,.34);
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
   }
   :global(.app-select-viewport) { padding: 5px; overflow: auto }
   :global(.app-select-item) {
     display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 7px 9px;
     border-radius: 8px; outline: 0; color: #c9c4cd; cursor: pointer; user-select: none;
   }
-  :global(.app-select-item[data-highlighted]) { color: var(--text); background: var(--hover) }
-  :global(.app-select-item[data-selected]) { color: var(--text); background: var(--selected) }
+  :global(.app-select-item[data-highlighted]) { color: var(--text); background: var(--surface-hover) }
+  :global(.app-select-item[data-selected]) { color: var(--text); background: var(--surface-hover) }
   :global(.app-select-copy) { display: flex; flex: 1; flex-direction: column; gap: 2px }
   :global(.app-select-copy strong) { font-size: 12px; font-weight: 550 }
   :global(.app-select-copy small) { color: var(--muted); font-size: 10px }
