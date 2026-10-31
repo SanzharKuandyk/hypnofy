@@ -14,7 +14,7 @@
     Download,
     Pencil,
   } from "@lucide/svelte";
-  import { Button, Dialog, Field } from "../shared/ui";
+  import { Button, Dialog, Field, Select, Input, Checkbox } from "../shared/ui";
   import { api } from "../shared/rpc/client";
   import { chooseExportFolder } from "../shared/platform/dialogs";
   import type { Workspace } from "../app/workflows/workspace.svelte";
@@ -95,7 +95,7 @@
   {/if}
   <div class="toolbar">
     <div class="search-field">
-      <Search size={16} /><input
+      <Search size={16} /><Input
         aria-label="Search scripts"
         placeholder="Search scripts…"
         bind:value={localSearch}
@@ -149,12 +149,12 @@
       <thead
         ><tr
           ><th
-            ><input
-              type="checkbox"
-              aria-label="Select all scripts"
-              checked={selected.length === w.scripts.length}
-              onchange={(event) =>
-                (selected = event.currentTarget.checked ? w.scripts.map((s) => s.id) : [])}
+            ><Checkbox
+              label="Select all scripts"
+              checked={w.scripts.every((script) => selected.includes(script.id))}
+              indeterminate={w.scripts.some((script) => selected.includes(script.id)) &&
+                !w.scripts.every((script) => selected.includes(script.id))}
+              onchange={(value) => (selected = value ? w.scripts.map((s) => s.id) : [])}
             /></th
           ><th>Name</th><th>Collection</th><th>Edited</th><th>Favorite</th><th
             ><span class="muted">Actions</span></th
@@ -163,9 +163,8 @@
       ><tbody>
         {#each w.scripts as script (script.id)}<tr class:selected={selected.includes(script.id)}
             ><td
-              ><input
-                type="checkbox"
-                aria-label={`Select ${script.title}`}
+              ><Checkbox
+                label={`Select ${script.title}`}
                 checked={selected.includes(script.id)}
                 onchange={() => toggle(script.id)}
               /></td
@@ -275,10 +274,11 @@
 >
 <Dialog bind:open={move} title="Move scripts"
   ><Field label="Collection"
-    ><select aria-label="Destination collection" bind:value={target}
-      >{#each w.collections as item (item.id)}<option value={item.id}>{item.name}</option
-        >{/each}</select
-    ></Field
+    ><Select
+      label="Destination collection"
+      bind:value={target}
+      options={[...w.collections.map((item) => ({ value: item.id, label: `${item.name}` }))]}
+    /></Field
   >
   <div class="actions">
     <Button onclick={() => (move = false)}>Cancel</Button><Button
@@ -288,7 +288,7 @@
   </div></Dialog
 >
 <Dialog bind:open={rename} title="Rename collection"
-  ><Field label="Name"><input aria-label="Collection name" bind:value={collectionName} /></Field>
+  ><Field label="Name"><Input aria-label="Collection name" bind:value={collectionName} /></Field>
   <div class="actions">
     <Button onclick={() => (rename = false)}>Cancel</Button><Button
       variant="primary"
@@ -324,10 +324,15 @@
   title="Export selected scripts"
   description="A new folder is published only after every selected script exports successfully. Existing files are kept."
   ><Field label="Format"
-    ><select aria-label="Bulk export format" bind:value={exportFormat}
-      ><option value="json">Hypnofy JSON · lossless</option><option value="md">Markdown</option
-      ><option value="txt">Plain text</option></select
-    ></Field
+    ><Select
+      label="Bulk export format"
+      bind:value={exportFormat}
+      options={[
+        { value: "json", label: `Hypnofy JSON · lossless` },
+        { value: "md", label: `Markdown` },
+        { value: "txt", label: `Plain text` },
+      ]}
+    /></Field
   >
   <div class="actions">
     <Button onclick={() => (exportOpen = false)}>Cancel</Button><Button

@@ -1,0 +1,375 @@
+.ui-select,
+.control-input,
+.control-textarea,
+.number-field {
+  min-height: 40px;
+  max-width: 100%;
+  border: 1px solid var(--control);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ui-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  font-weight: 400;
+}
+.ui-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select > svg {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.12s;
+}
+.ui-select[data-state="open"] > svg {
+  transform: rotate(180deg);
+}
+.ui-select:hover:not(:disabled),
+.control-input:hover:not(:disabled),
+.control-textarea:hover:not(:disabled),
+.number-field:hover:not(.disabled) {
+  border-color: var(--accent);
+}
+.ui-select[data-state="open"],
+.number-field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-select[aria-invalid="true"],
+.control-input[aria-invalid="true"],
+.control-textarea[aria-invalid="true"],
+.number-field.invalid {
+  border-color: var(--danger);
+}
+.ui-select:disabled,
+.number-field.disabled,
+.control-input:disabled,
+.control-textarea:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.control-menu {
+  z-index: 150;
+  width: var(--bits-select-anchor-width);
+  min-width: min(200px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--bits-select-content-available-height));
+  border: 1px solid var(--control);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px;
+  box-shadow: 0 10px 24px #00000038;
+  outline: none;
+  overflow: hidden;
+}
+.control-options {
+  max-height: min(346px, calc(var(--bits-select-content-available-height) - 14px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* Bits hides viewport scrollbars by default. Long lists use the app's grip. */
+.control-options[data-select-viewport] {
+  scrollbar-width: auto !important;
+  scrollbar-gutter: stable;
+}
+.control-options[data-select-viewport]::-webkit-scrollbar {
+  display: block !important;
+}
+.control-option {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+  line-height: 20px;
+  outline: none;
+  user-select: none;
+  cursor: pointer;
+}
+.control-option[data-highlighted],
+.control-option[data-selected] {
+  background: var(--tint);
+}
+.control-option[data-disabled] {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: default;
+}
+.control-option-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.control-option-copy small {
+  color: var(--muted);
+}
+.option-check {
+  width: 16px;
+  flex: none;
+  color: var(--accent);
+}
+.control-menu-empty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.control-tooltip {
+  z-index: 180;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--control);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 18px;
+  box-shadow: 0 10px 24px #00000038;
+  overflow-wrap: anywhere;
+}
+.control-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 70px;
+  height: 24px;
+  flex: 1;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+.slider-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.slider-range {
+  position: absolute;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent-ink);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.slider-thumb:hover {
+  box-shadow: 0 0 0 4px var(--tint);
+}
+.slider-thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.control-slider[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.number-field {
+  display: inline-flex;
+  align-items: stretch;
+  width: 160px;
+  min-width: 130px;
+  overflow: hidden;
+}
+.number-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  text-align: center;
+  appearance: textfield;
+}
+.number-field input::-webkit-inner-spin-button,
+.number-field input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.stepper {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.stepper:hover:not(:disabled) {
+  background: var(--tint);
+  color: var(--text);
+}
+.stepper:focus-visible {
+  outline-offset: -3px;
+}
+.control-input,
+.control-textarea {
+  width: 100%;
+  padding: 9px 12px;
+}
+.control-input::placeholder,
+.control-textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.control-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.control-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: var(--text);
+}
+.control-textarea {
+  min-height: 128px;
+  max-height: 40vh;
+  resize: none;
+  field-sizing: content;
+  line-height: 1.7;
+}
+.password-field {
+  position: relative;
+  width: 100%;
+}
+.password-field input {
+  padding-right: 44px;
+}
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+}
+.password-toggle:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.checkbox {
+  vertical-align: middle;
+  cursor: pointer;
+}
+.checkbox[data-state="indeterminate"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.control-progress {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  min-width: 80px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.progress-fill.indeterminate {
+  animation: control-progress 1.4s ease-in-out infinite;
+}
+@keyframes control-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(440%);
+  }
+}
+.field > .ui-select {
+  width: 100%;
+}
+.player-detail .ui-select {
+  width: 150px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.player-detail .control-slider {
+  flex: 0 0 90px;
+}
+.script-meta .ui-select {
+  width: auto;
+  max-width: 260px;
+}
+.setting-row > .control-slider {
+  max-width: 240px;
+}
+.control-input.title-input {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.control-input.title-input:focus-visible {
+  outline: 0;
+}
+.search-field .control-input {
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+}
+.nav-item.button {
+  justify-content: flex-start;
+  font-weight: inherit;
+}
+.nav-item.button.active {
+  border-color: transparent;
+}
+@media (max-width: 767px) {
+  .control-input.title-input {
+    font-size: 24px;
+  }
+  .setting-row > .control-slider {
+    max-width: none;
+  }
+  .theme-option .row {
+    flex-wrap: nowrap;
+    gap: 5px;
+    font-size: 13px;
+  }
+}

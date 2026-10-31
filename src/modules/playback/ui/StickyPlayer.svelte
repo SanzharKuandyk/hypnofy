@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Play, Pause, Square, Volume2, Clock, Download } from "@lucide/svelte";
-  import { Button } from "../../../shared/ui";
+  import { Button, Select, Slider } from "../../../shared/ui";
   import type { PlaybackState, RenderRecord } from "../../../domain";
 
   let {
@@ -45,33 +45,37 @@
       ><Button disabled={!render} onclick={onexport}><Download size={15} />Export WAV</Button></span
     >
   </div>
-  <input
-    aria-label="Playback position"
-    type="range"
-    min="0"
+  <Slider
+    label="Playback position"
+    min={0}
     max={Math.max(1, render?.durationMs ?? 0)}
+    step={1}
     value={loaded ? (state?.positionMs ?? 0) : 0}
     disabled={!loaded}
-    onchange={(event) => oncontrol("seek", Number(event.currentTarget.value))}
+    oncommit={(value) => oncontrol("seek", Number(value))}
   />
   <div class="player-detail">
-    <Volume2 size={15} /><input
-      aria-label="Narration volume"
-      type="range"
-      min="0"
-      max="1"
-      step=".01"
+    <Volume2 size={15} /><Slider
+      label="Narration volume"
+      min={0}
+      max={1}
+      step={0.01}
       value={state?.volume ?? 1}
       style="width:90px"
-      onchange={(event) => oncontrol("volume", Number(event.currentTarget.value))}
-    /><span class="extra">Narration</span><Clock size={14} /><select
-      aria-label="Sleep timer"
+      oncommit={(value) => oncontrol("volume", Number(value))}
+    /><span class="extra">Narration</span><Clock size={14} /><Select
+      label="Sleep timer"
       style="padding:2px 6px"
-      onchange={(event) => oncontrol("sleep", Number(event.currentTarget.value))}
-      ><option value="0">Sleep timer off</option><option value="10">10 minutes</option><option
-        value="20">20 minutes</option
-      ><option value="30">30 minutes</option><option value="60">60 minutes</option></select
-    >{#if state?.sleepRemainingMs}<span>{time(state.sleepRemainingMs)} left</span
+      onchange={(value) => oncontrol("sleep", Number(value))}
+      value="0"
+      options={[
+        { value: "0", label: `Sleep timer off` },
+        { value: "10", label: `10 minutes` },
+        { value: "20", label: `20 minutes` },
+        { value: "30", label: `30 minutes` },
+        { value: "60", label: `60 minutes` },
+      ]}
+    />{#if state?.sleepRemainingMs}<span>{time(state.sleepRemainingMs)} left</span
       >{/if}{#if state?.error}<span role="alert">{state.error}</span>{/if}
   </div>
 </div>

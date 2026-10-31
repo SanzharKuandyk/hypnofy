@@ -11,7 +11,7 @@
     Settings,
     ShieldCheck,
   } from "@lucide/svelte";
-  import { Button } from "../../shared/ui";
+  import { Button, Input } from "../../shared/ui";
   import type { Workspace } from "../workflows/workspace.svelte";
   import type { Route } from "../routes";
 
@@ -36,12 +36,12 @@
     ><Moon size={26} />Hypnofy</button
   >
   <div class="sidebar-search">
-    <Search size={15} /><input
+    <Search size={15} /><Input
       aria-label="Search your library"
       placeholder="Search anything…"
       value={w.query}
-      oninput={(event) => {
-        w.query = event.currentTarget.value;
+      oninput={(value) => {
+        w.query = value;
       }}
       onkeydown={(event) => {
         if (event.key === "Enter") navigate({ kind: "library", view: "all", collectionId: null });
@@ -57,26 +57,26 @@
       })}><Plus size={17} />New script</Button
   >
   <nav class="nav-group">
-    <button
+    <Button
+      variant="ghost"
       title="All scripts"
-      class:active={w.route.kind === "library" && w.route.view === "all" && !w.route.collectionId}
-      class="nav-item"
+      class={`nav-item${w.route.kind === "library" && w.route.view === "all" && !w.route.collectionId ? " active" : ""}`}
       onclick={() => navigate({ kind: "library", view: "all", collectionId: null })}
-      ><Files /><span class="label">All scripts</span></button
+      ><Files /><span class="label">All scripts</span></Button
     >
-    <button
+    <Button
+      variant="ghost"
       title="Favorites"
-      class:active={w.route.kind === "library" && w.route.view === "favorites"}
-      class="nav-item"
+      class={`nav-item${w.route.kind === "library" && w.route.view === "favorites" ? " active" : ""}`}
       onclick={() => navigate({ kind: "library", view: "favorites", collectionId: null })}
-      ><Star /><span class="label">Favorites</span></button
+      ><Star /><span class="label">Favorites</span></Button
     >
-    <button
+    <Button
+      variant="ghost"
       title="Trash"
-      class:active={w.route.kind === "library" && w.route.view === "trash"}
-      class="nav-item"
+      class={`nav-item${w.route.kind === "library" && w.route.view === "trash" ? " active" : ""}`}
       onclick={() => navigate({ kind: "library", view: "trash", collectionId: null })}
-      ><Trash2 /><span class="label">Trash</span></button
+      ><Trash2 /><span class="label">Trash</span></Button
     >
   </nav>
   <div class="sidebar-heading">
@@ -98,19 +98,19 @@
       >{/each}
   </nav>
   <div class="sidebar-footer">
-    <button
-      class="nav-item"
-      class:active={w.route.kind === "models"}
+    <Button
+      variant="ghost"
+      class={`nav-item${w.route.kind === "models" ? " active" : ""}`}
       title="Models & voices"
       onclick={() => navigate({ kind: "models" })}
-      ><Box /><span class="label">Models & voices</span></button
+      ><Box /><span class="label">Models & voices</span></Button
     >
-    <button
-      class="nav-item"
-      class:active={w.route.kind === "settings"}
+    <Button
+      variant="ghost"
+      class={`nav-item${w.route.kind === "settings" ? " active" : ""}`}
       title="Settings"
       onclick={() => navigate({ kind: "settings", section: "appearance" })}
-      ><Settings /><span class="label">Settings</span></button
+      ><Settings /><span class="label">Settings</span></Button
     >
     <div class="local-status"><ShieldCheck size={16} />Your library stays on this device</div>
   </div>

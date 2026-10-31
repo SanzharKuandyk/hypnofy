@@ -20,7 +20,7 @@
     Undo2,
     Redo2,
   } from "@lucide/svelte";
-  import { Button } from "../../../shared/ui";
+  import { Button, Select, NumberField } from "../../../shared/ui";
   import { decodeDocument } from "../../../domain/document";
   import type { ScriptDocument, DeliveryOverride } from "../../../domain/document";
 
@@ -43,6 +43,7 @@
   let slash = $state(false);
   let pauseOpen = $state(false);
   let seconds = $state(5);
+  let paragraphStyle = $state("text");
   let selectedPause: number | null = null;
 
   const blocks = ["paragraph", "heading", "bulletList", "orderedList", "listItem", "pause"];
@@ -320,6 +321,7 @@
       onUpdate: ({ editor: instance }) =>
         onchange(decodeDocument({ ...instance.getJSON(), version: 2 })),
       onSelectionUpdate: ({ editor: instance }) => {
+        paragraphStyle = instance.isActive("heading", {level:2}) ? "2" : instance.isActive("heading", {level:3}) ? "3" : "text";
         const { from, to } = instance.state.selection;
         const node = instance.state.doc.nodeAt(from);
         if (
@@ -364,11 +366,12 @@
     aria-label="Strikethrough"
     onclick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough size={16} /></Button
   >
-  <select
-    aria-label="Paragraph style"
+  <Select
+    label="Paragraph style"
+    onclose={() => editor?.commands.focus()}
     style="width:118px"
-    onchange={(event) => {
-      const level = event.currentTarget.value;
+    onchange={(value) => {
+      const level = value;
       if (level === "2" || level === "3")
         editor
           ?.chain()
@@ -377,10 +380,13 @@
           .run();
       else editor?.chain().focus().setParagraph().run();
     }}
-    ><option value="text">Text</option><option value="2">Heading 2</option><option value="3"
-      >Heading 3</option
-    ></select
-  >
+    bind:value={paragraphStyle}
+    options={[
+      { value: "text", label: `Text` },
+      { value: "2", label: `Heading 2` },
+      { value: "3", label: `Heading 3` },
+    ]}
+  />
   <Button
     variant="ghost"
     class="icon"
@@ -417,14 +423,14 @@
   <Button variant="ghost" onclick={ask}><Sparkles size={15} />Ask AI</Button>
 </div>
 {#if pauseOpen}<div class="row">
-    <label for="pause-seconds">Pause in seconds</label><input
+    <label for="pause-seconds">Pause in seconds</label><NumberField
+      label="Pause in seconds"
       id="pause-seconds"
-      type="number"
-      min=".5"
-      max="120"
-      step=".5"
+      min={0.5}
+      max={120}
+      step={0.5}
       bind:value={seconds}
-      style="width:100px"
+      style="width:170px"
     /><Button
       disabled={!Number.isFinite(seconds) || seconds < 0.5 || seconds > 120}
       onclick={insertPause}>Insert pause</Button

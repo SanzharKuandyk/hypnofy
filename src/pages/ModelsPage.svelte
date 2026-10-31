@@ -12,7 +12,7 @@
     Trash2,
     ShieldCheck,
   } from "@lucide/svelte";
-  import { Button, Badge, Dialog, Field } from "../shared/ui";
+  import { Button, Badge, Dialog, Field, Select } from "../shared/ui";
   import { api } from "../shared/rpc/client";
   import { newJobId } from "../domain/ids";
   import { chooseGguf, chooseModelFolder } from "../shared/platform/dialogs";
@@ -131,19 +131,22 @@
                   onclick={() => w.action(() => w.savePreferences({ textModelId: model.id }))}
                   >{#if w.preferences?.textModelId === model.id}<Check size={15} />Default for
                     writing{:else}Use for writing{/if}</Button
-                >{:else}<select
-                  aria-label={`Default voice from ${model.name}`}
+                >{:else}<Select
+                  label={`Default voice from ${model.name}`}
                   disabled={model.status !== "ready"}
                   value={model.voices.some((v) => v.id === w.preferences?.voiceId)
                     ? (w.preferences?.voiceId ?? "")
                     : ""}
-                  onchange={(event) =>
-                    w.action(() => w.savePreferences({ voiceId: event.currentTarget.value }))}
-                  ><option value="">Set default voice…</option
-                  >{#each model.voices as voice (voice.id)}<option value={voice.id}
-                      >{voice.name} · {voice.language}</option
-                    >{/each}</select
-                >{/if}
+                  style="width:260px"
+                  onchange={(value) => w.action(() => w.savePreferences({ voiceId: value || null }))}
+                  options={[
+                    { value: "", label: `Set default voice…` },
+                    ...model.voices.map((voice) => ({
+                      value: voice.id,
+                      label: `${voice.name} · ${voice.language}`,
+                    })),
+                  ]}
+                />{/if}
               {#if model.provider !== "openrouter"}<Button
                   variant="ghost"
                   onclick={() =>
@@ -221,11 +224,15 @@
   title={relinkId ? "Relink model" : "Link an existing model"}
   description="Your files stay where they are. Unlinking never deletes them."
   ><Field label="Model type"
-    ><select aria-label="Model type" bind:value={kind}
-      ><option value="text">Text · GGUF file</option><option value="kokoro"
-        >Kokoro · speech folder</option
-      ><option value="supertonic">Supertonic · speech folder</option></select
-    ></Field
+    ><Select
+      label="Model type"
+      bind:value={kind}
+      options={[
+        { value: "text", label: `Text · GGUF file` },
+        { value: "kokoro", label: `Kokoro · speech folder` },
+        { value: "supertonic", label: `Supertonic · speech folder` },
+      ]}
+    /></Field
   >
   <p class="muted">
     Speech folders must include the model, configuration and voice files expected by NobodyWho.

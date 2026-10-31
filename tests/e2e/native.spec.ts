@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import type { ChildProcess } from "node:child_process";
 import type { Browser, Page } from "@playwright/test";
 import type {
@@ -11,6 +12,7 @@ import type {
   Script,
   ScriptPatch,
   RenderRecord,
+  Preferences,
 } from "../../src/shared/rpc/generated/bindings";
 
 declare global {
@@ -496,6 +498,95 @@ test("dark and light layouts fit the four approved viewports", async () => {
     });
     await page.setViewportSize({ width: 1440, height: 960 });
   }
+  expect(errors).toEqual([]);
+});
+
+test("model and settings controls use themed popups and persist typed values", async () => {
+  const model: ModelRecord = {
+    id: "synthetic-speech-model",
+    name: "Supertonic test voices",
+    provider: "nobodywho",
+    capability: "speech",
+    architecture: "supertonic",
+    path: join(root, "synthetic-speech"),
+    ownership: "linked",
+    status: "ready",
+    reason: null,
+    fingerprint: "synthetic-ui-fixture",
+    contextTokens: null,
+    voices: Array.from({ length: 10 }, (_, index) => ({
+      id: `synthetic-voice-${index + 1}`,
+      name: `F${index + 1}`,
+      language: "en",
+    })),
+  };
+  // Seed only this run's disposable database. No model files are opened and no
+  // inference, verification or download is started. IPC remains unmodified.
+  const database = new DatabaseSync(join(root, "workspace", "hypnofy.sqlite3"));
+  try {
+    database.exec("PRAGMA busy_timeout=5000");
+    database
+      .prepare("INSERT INTO installed_models(id,name,record_json) VALUES(?,?,?)")
+      .run(model.id, model.name, JSON.stringify(model));
+  } finally {
+    database.close();
+  }
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "All scripts", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+  expect(await native<ModelRecord[]>("models.list")).toEqual([model]);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  for (const theme of ["light", "dark"]) {
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page
+      .getByRole("button", { name: theme === "dark" ? "Dark" : "Light", exact: true })
+      .click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.getByRole("button", { name: "Models & voices", exact: true }).click();
+    await expect(page.getByRole("heading", { name: model.name, exact: true })).toBeVisible();
+    const voice = page.getByRole("button", {
+      name: `Default voice from ${model.name}`,
+      exact: true,
+    });
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 960 });
+      await voice.click();
+      const popup = page.getByRole("listbox");
+      await expect(popup).toBeVisible();
+      const box = await popup.boundingBox();
+      if (!box) throw new Error("Missing model voice popup");
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y + box.height).toBeLessThanOrEqual(960);
+      await page.screenshot({ path: `test-results/model-controls-${theme}-${width}.png` });
+      await page.getByRole("option", { name: "F4 · en", exact: true }).click();
+      await expect(voice).toContainText("F4 · en");
+      await expect
+        .poll(async () => (await native<Preferences>("settings.get")).voiceId)
+        .toBe("synthetic-voice-4");
+      expect(await page.locator("select:visible").count()).toBe(0);
+    }
+    await page.setViewportSize({ width: 1440, height: 960 });
+  }
+  await page.getByRole("button", { name: "Link existing", exact: true }).click();
+  await page.getByRole("button", { name: "Model type", exact: true }).click();
+  await page.getByRole("option", { name: "Supertonic · speech folder", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Choose folder", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Voice & playback", exact: true }).click();
+  const pace = page.getByRole("spinbutton", { name: "Default pace", exact: true });
+  await pace.fill("1.15");
+  await pace.press("Tab");
+  await expect.poll(async () => (await native<Preferences>("settings.get")).speed).toBe(1.15);
+  const volume = page.getByRole("slider", { name: "Default narration volume", exact: true });
+  await volume.focus();
+  await volume.press("Home");
+  await volume.press("ArrowRight");
+  await expect
+    .poll(async () => (await native<Preferences>("settings.get")).narrationVolume)
+    .toBe(0.01);
+  await page.screenshot({ path: "test-results/settings-controls-dark.png" });
   expect(errors).toEqual([]);
 });
 

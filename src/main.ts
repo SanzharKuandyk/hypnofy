@@ -3,6 +3,7 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/lora/400.css";
 import "./shared/theme/tokens.css";
+import "./shared/theme/controls.css";
 import App from "./app/App.svelte";
 import { mount } from "svelte";
 import { initializeTheme } from "./shared/theme/theme";

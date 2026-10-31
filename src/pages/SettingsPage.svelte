@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Moon, Sun, Monitor, Cpu, Link2, FolderOpen } from "@lucide/svelte";
-  import { Button, Badge, Field, Dialog } from "../shared/ui";
+  import { Button, Badge, Field, Dialog, Select, Slider, NumberField, Input } from "../shared/ui";
   import { api } from "../shared/rpc/client";
   import { chooseModelFolder } from "../shared/platform/dialogs";
   import type { Workspace } from "../app/workflows/workspace.svelte";
@@ -138,7 +138,7 @@
             <Field
               label="API key"
               help="Stored in Windows Credential Manager. It is never returned to the interface."
-              ><input
+              ><Input
                 type="password"
                 aria-label="OpenRouter API key"
                 autocomplete="off"
@@ -151,17 +151,20 @@
       </section>
       <section class="card">
         <h2>Writing default</h2>
-        <select
-          aria-label="Default writing model"
+        <Select
+          label="Default writing model"
           value={w.preferences?.textModelId ?? ""}
-          onchange={(event) =>
-            w.action(() => w.savePreferences({ textModelId: event.currentTarget.value || null }))}
-          ><option value="">Choose a writing model</option
-          >{#each w.models.filter((m) => m.capability === "text" && m.status === "ready") as model (model.id)}<option
-              value={model.id}
-              >{model.name} · {model.provider === "openrouter" ? "Cloud" : "Local"}</option
-            >{/each}</select
-        >
+          onchange={(value) => w.action(() => w.savePreferences({ textModelId: value || null }))}
+          options={[
+            { value: "", label: `Choose a writing model` },
+            ...w.models
+              .filter((m) => m.capability === "text" && m.status === "ready")
+              .map((model) => ({
+                value: model.id,
+                label: `${model.name} · ${model.provider === "openrouter" ? "Cloud" : "Local"}`,
+              })),
+          ]}
+        />
       </section>
     {:else if section === "voice"}<header>
         <h1>Voice & playback</h1>
@@ -171,30 +174,31 @@
       </header>
       <section class="card">
         <Field label="Default voice"
-          ><select
-            aria-label="Default voice"
+          ><Select
+            label="Default voice"
             value={w.preferences?.voiceId ?? ""}
-            onchange={(event) =>
-              w.action(() => w.savePreferences({ voiceId: event.currentTarget.value || null }))}
-            ><option value="">Choose a voice</option>{#each voices as voice (voice.id)}<option
-                value={voice.id}>{voice.name} · {voice.language}</option
-              >{/each}</select
-          ></Field
+            onchange={(value) => w.action(() => w.savePreferences({ voiceId: value || null }))}
+            options={[
+              { value: "", label: `Choose a voice` },
+              ...voices.map((voice) => ({
+                value: voice.id,
+                label: `${voice.name} · ${voice.language}`,
+              })),
+            ]}
+          /></Field
         >
         <div class="setting-row">
           <div>
             <h3>Default pace</h3>
             <p>Supported by installed Kokoro and Supertonic adapters.</p>
           </div>
-          <input
-            aria-label="Default pace"
-            type="number"
-            min=".5"
-            max="2"
-            step=".05"
+          <NumberField
+            label="Default pace"
+            min={0.5}
+            max={2}
+            step={0.05}
             value={w.preferences?.speed ?? 1}
-            onchange={(event) =>
-              w.action(() => w.savePreferences({ speed: Number(event.currentTarget.value) }))}
+            oncommit={(value) => w.action(() => w.savePreferences({ speed: Number(value) }))}
           />
         </div>
         <div class="setting-row">
@@ -202,49 +206,42 @@
             <h3>Paragraph pause</h3>
             <p>Seconds between passages, unless overridden.</p>
           </div>
-          <input
-            aria-label="Default paragraph pause"
-            type="number"
-            min="0"
-            max="30"
-            step=".5"
+          <NumberField
+            label="Default paragraph pause"
+            min={0}
+            max={30}
+            step={0.5}
             value={(w.preferences?.paragraphPauseMs ?? 2000) / 1000}
-            onchange={(event) =>
+            oncommit={(value) =>
               w.action(() =>
                 w.savePreferences({
-                  paragraphPauseMs: Math.round(Number(event.currentTarget.value) * 1000),
+                  paragraphPauseMs: Math.round(Number(value) * 1000),
                 }),
               )}
           />
         </div>
         <div class="setting-row">
           <h3>Narration volume</h3>
-          <input
-            aria-label="Default narration volume"
-            type="range"
-            min="0"
-            max="1"
-            step=".01"
+          <Slider
+            label="Default narration volume"
+            min={0}
+            max={1}
+            step={0.01}
             value={w.preferences?.narrationVolume ?? 1}
-            onchange={(event) =>
-              w.action(() =>
-                w.savePreferences({ narrationVolume: Number(event.currentTarget.value) }),
-              )}
+            oncommit={(value) =>
+              w.action(() => w.savePreferences({ narrationVolume: Number(value) }))}
           />
         </div>
         <div class="setting-row">
           <h3>Ambience volume</h3>
-          <input
-            aria-label="Default ambience volume"
-            type="range"
-            min="0"
-            max="1"
-            step=".01"
+          <Slider
+            label="Default ambience volume"
+            min={0}
+            max={1}
+            step={0.01}
             value={w.preferences?.ambienceVolume ?? 0.06}
-            onchange={(event) =>
-              w.action(() =>
-                w.savePreferences({ ambienceVolume: Number(event.currentTarget.value) }),
-              )}
+            oncommit={(value) =>
+              w.action(() => w.savePreferences({ ambienceVolume: Number(value) }))}
           />
         </div>
       </section>

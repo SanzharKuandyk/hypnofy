@@ -4,7 +4,7 @@ Windows desktop application for writing, organizing, generating and narrating se
 
 ## Development
 
-Requires Node.js 22+, Rust 1.98+, WebView2, Visual Studio C++ tools, the Vulkan SDK and Ninja at C:/DevTools/ninja.exe. The launcher discovers Visual Studio and the installed Vulkan SDK, initializes the x64 compiler environment, and uses the ignored short .b directory to avoid Windows native compiler path limits.
+Requires Node.js 22.13+, Rust 1.98+, WebView2, Visual Studio C++ tools, the Vulkan SDK and Ninja at C:/DevTools/ninja.exe. Native UI fixtures use Node's built-in SQLite support. The launcher discovers Visual Studio and the installed Vulkan SDK, initializes the x64 compiler environment, and uses the ignored short .b directory to avoid Windows native compiler path limits.
 
 ```powershell
 npm ci --ignore-scripts
@@ -28,6 +28,7 @@ Run .b/debug/Hypnofy-dev.exe from its build folder, keeping hypnofy-inference-wo
 - Passage previews, saved narration, native playback/seek, ambience, sleep timer, mono narration WAV and stereo mixed WAV export at 48 kHz/16-bit PCM.
 - UTF-8 TXT, Markdown and lossless versioned Hypnofy JSON import/export; bulk export publishes one new folder after every file succeeds.
 - Required launch acknowledgment, with the same information accessible from Settings/Help.
+- Shared dark/light selectors and popup lists, text/password fields, bounded steppers, sliders, checkboxes, progress and tooltips. Keyboard interaction and narrow-window popup placement are covered by component and native UI tests.
 
 The application identifier remains app.hypnofy.desktop and Tauri resolves the existing application-data directory. SQLite migrations back up older databases before upgrading to schema 7. Unsupported legacy documents remain preserved and can be exported for recovery. Migration backups, scripts, revisions, pending suggestions, saved renders and user exports are persistent work.
 

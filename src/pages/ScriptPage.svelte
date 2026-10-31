@@ -14,7 +14,7 @@
     History,
     Link2,
   } from "@lucide/svelte";
-  import { Button, Badge, Dialog, Field } from "../shared/ui";
+  import { Button, Badge, Dialog, Field, Select, Input, Slider, NumberField } from "../shared/ui";
   import { loadScriptEditor } from "../modules/editor";
   import type { EditorSelection } from "../modules/editor";
   import { GenerationPanel } from "../modules/generation";
@@ -207,59 +207,63 @@
     </div>
     <p class="caption muted">Start with script defaults, then shape individual passages.</p>
     <Field label="Script voice"
-      ><select
-        aria-label="Script voice"
+      ><Select
+        label="Script voice"
         value={script.session.voiceId}
-        onchange={(event) => w.editor.session({ voiceId: event.currentTarget.value || null })}
-        ><option value="">Choose a voice</option>{#each voices as voice (voice.id)}<option
-            value={voice.id}>{voice.name} · {voice.language}</option
-          >{/each}</select
-      ></Field
+        onchange={(value) => w.editor.session({ voiceId: value || null })}
+        options={[
+          { value: "", label: `Choose a voice` },
+          ...voices.map((voice) => ({
+            value: voice.id,
+            label: `${voice.name} · ${voice.language}`,
+          })),
+        ]}
+      /></Field
     >
     {#if !voices.length}<p class="caption muted">Install a speech model to enable voices.</p>
       <Button onclick={() => w.action(() => w.navigate({ kind: "models" }))}>Get a voice</Button
       >{/if}
     <Field label={`Script pace · ${(script.session.speed ?? 1).toFixed(2)}×`}
-      ><input
-        aria-label="Script pace"
-        type="range"
-        min=".5"
-        max="2"
-        step=".05"
-        value={script.session.speed}
-        oninput={(event) => w.editor.session({ speed: Number(event.currentTarget.value) })}
+      ><Slider
+        label="Script pace"
+        min={0.5}
+        max={2}
+        step={0.05}
+        value={script.session.speed ?? 1}
+        onchange={(value) => w.editor.session({ speed: Number(value) })}
       /></Field
     >
     <Field label="Paragraph pause · seconds"
-      ><input
-        aria-label="Paragraph pause"
-        type="number"
-        min="0"
-        max="30"
-        step=".5"
+      ><NumberField
+        label="Paragraph pause"
+        min={0}
+        max={30}
+        step={0.5}
         value={script.session.paragraphPauseMs / 1000}
-        onchange={(event) =>
+        onchange={(value) =>
           w.editor.session({
-            paragraphPauseMs: Math.round(Number(event.currentTarget.value) * 1000),
+            paragraphPauseMs: Math.round(Number(value) * 1000),
           })}
       /></Field
     >
     <hr style="border:0;border-top:1px solid var(--line);width:100%" />
     <h3>{hasSelection ? "Selected text" : "Current passage"}</h3>
     <Field label="Voice override"
-      ><select aria-label="Passage voice" bind:value={overrideVoice}
-        ><option value="">Inherit script voice</option>{#each voices as voice (voice.id)}<option
-            value={voice.id}>{voice.name}</option
-          >{/each}</select
-      ></Field
+      ><Select
+        label="Passage voice"
+        bind:value={overrideVoice}
+        options={[
+          { value: "", label: `Inherit script voice` },
+          ...voices.map((voice) => ({ value: voice.id, label: `${voice.name}` })),
+        ]}
+      /></Field
     >
     <Field label={`Pace override · ${overrideSpeed.toFixed(2)}×`}
-      ><input
-        aria-label="Passage pace"
-        type="range"
-        min=".5"
-        max="2"
-        step=".05"
+      ><Slider
+        label="Passage pace"
+        min={0.5}
+        max={2}
+        step={0.05}
         bind:value={overrideSpeed}
       /></Field
     >
@@ -282,18 +286,19 @@
     </p>
     <hr style="border:0;border-top:1px solid var(--line);width:100%" />
     <Field label="Ambience"
-      ><select
-        aria-label="Ambience track"
+      ><Select
+        label="Ambience track"
         bind:value={ambienceId}
         onchange={() =>
           w.action(async () => {
             w.editor.session({ ambienceId: ambienceId || null });
             await api.playback.selectAmbience(ambienceId || null);
           })}
-        ><option value="">None</option>{#each w.ambience as ambient (ambient.id)}<option
-            value={ambient.id}>{ambient.name}</option
-          >{/each}</select
-      ></Field
+        options={[
+          { value: "", label: `None` },
+          ...w.ambience.map((ambient) => ({ value: ambient.id, label: `${ambient.name}` })),
+        ]}
+      /></Field
     >
     <Button
       variant="ghost"
@@ -307,15 +312,14 @@
         })}>Import ambience</Button
     >
     <Field label="Ambience volume"
-      ><input
-        aria-label="Ambience volume"
-        type="range"
-        min="0"
-        max="1"
-        step=".01"
-        value={w.playback?.ambienceVolume ?? script.session.ambienceVolume}
-        oninput={(event) => {
-          const volume = Number(event.currentTarget.value);
+      ><Slider
+        label="Ambience volume"
+        min={0}
+        max={1}
+        step={0.01}
+        value={w.playback?.ambienceVolume ?? script.session.ambienceVolume ?? 0.06}
+        onchange={(value) => {
+          const volume = Number(value);
           w.editor.session({ ambienceVolume: volume });
           void w.action(async () => {
             await api.playback.control("ambience-volume", volume);
@@ -435,20 +439,23 @@
     <div class="writing-scroll" hidden={tab !== "write"}>
       <div class="writing-canvas">
         <div class="script-meta">
-          <select
-            aria-label="Script collection"
+          <Select
+            label="Script collection"
             value={script.collectionId}
-            onchange={(event) => w.editor.metadata({ collectionId: event.currentTarget.value })}
-            >{#each w.collections as collection (collection.id)}<option value={collection.id}
-                >{collection.name}</option
-              >{/each}</select
-          ><span>Private script</span>
+            onchange={(value) => w.editor.metadata({ collectionId: value })}
+            options={[
+              ...w.collections.map((collection) => ({
+                value: collection.id,
+                label: `${collection.name}`,
+              })),
+            ]}
+          /><span>Private script</span>
         </div>
-        <input
+        <Input
           class="title-input"
           aria-label="Script title"
           value={script.title}
-          oninput={(event) => w.editor.title(event.currentTarget.value)}
+          oninput={(value) => w.editor.title(value)}
         />{#key `${script.id}:${w.editor.documentEpoch}`}{#await editorComponent then component}<component.default
               bind:this={editorView}
               document={w.editor.document}
@@ -494,23 +501,27 @@
               >{render.revision === script.revision
                 ? "Ready to listen"
                 : "Audio from an earlier revision"}</Badge
-            ><select
-              aria-label="Saved narration"
+            ><Select
+              label="Saved narration"
               value={render.id}
-              onchange={(event) => {
-                const id = event.currentTarget.value;
+              onchange={(value) => {
+                const id = value;
                 void w.action(async () => {
                   chosenRender = id;
                   await api.playback.load(id);
                   await w.poll();
                 });
               }}
-              >{#if render.preview}<option value={render.id}>Passage preview</option
-                >{/if}{#each w.renders.filter((r) => !r.preview) as audio (audio.id)}<option
-                  value={audio.id}
-                  >Revision {audio.revision} · {new Date(audio.createdAt).toLocaleString()}</option
-                >{/each}</select
-            >
+              options={[
+                ...(render.preview ? [{ value: render.id, label: `Passage preview` }] : []),
+                ...w.renders
+                  .filter((r) => !r.preview)
+                  .map((audio) => ({
+                    value: audio.id,
+                    label: `Revision ${audio.revision} · ${new Date(audio.createdAt).toLocaleString()}`,
+                  })),
+              ]}
+            />
           </div>{/if}{#each paragraphs as block, index (block.attrs?.id ?? index)}<article
             class="passage"
             class:active={w.playback?.renderId === render?.id &&
@@ -642,12 +653,14 @@
   title="Export WAV"
   description="48 kHz, 16-bit PCM. Exported files belong to you and are never automatically cleaned up."
   ><Field label="Include"
-    ><select aria-label="Audio export content" bind:value={exportMixed}
-      ><option value={false}>Narration only · mono</option><option
-        value={true}
-        disabled={!ambienceId}>Narration + ambience · stereo</option
-      ></select
-    ></Field
+    ><Select
+      label="Audio export content"
+      bind:value={exportMixed}
+      options={[
+        { value: false, label: `Narration only · mono` },
+        { value: true, label: `Narration + ambience · stereo`, disabled: !ambienceId },
+      ]}
+    /></Field
   >
   <div class="actions">
     <Button onclick={() => (exportOpen = false)}>Cancel</Button><Button

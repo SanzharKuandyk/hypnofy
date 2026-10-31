@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { Moon, Check } from "@lucide/svelte";
-  import { Checkbox } from "bits-ui";
-  import { Button, Dialog } from "../../../shared/ui";
+  import { Moon } from "@lucide/svelte";
+  import { Button, Dialog, Checkbox } from "../../../shared/ui";
   let {
     open = $bindable(true),
     help = false,
@@ -58,9 +57,7 @@
   </div>
   {#if !help}
     <label class="acknowledgment">
-      <Checkbox.Root bind:checked class="checkbox" aria-label="I have read the welcome notice"
-        >{#if checked}<Check size={16} />{/if}</Checkbox.Root
-      >
+      <Checkbox bind:checked label="I have read the welcome notice" />
       <span
         >I have read this notice and understand that Hypnofy does not replace professional care.</span
       >

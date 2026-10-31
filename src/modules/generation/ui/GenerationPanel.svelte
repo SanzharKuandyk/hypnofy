@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Field, Badge } from "../../../shared/ui";
+  import { Button, Field, Badge, Select, Textarea } from "../../../shared/ui";
   import { api } from "../../../shared/rpc/client";
   import type { ModelRecord, JobSnapshot, Suggestion } from "../../../domain";
 
@@ -44,27 +44,38 @@
     <Button variant="ghost" aria-label="Close AI panel" onclick={onclose}>×</Button>
   </div>
   <Field label="Writing model"
-    ><select aria-label="Writing model" bind:value={modelId}
-      ><option value="">Choose a model</option>{#each ready as model (model.id)}<option
-          value={model.id}
-          >{model.name} · {model.provider === "openrouter" ? "Cloud" : "Local"}</option
-        >{/each}</select
-    ></Field
+    ><Select
+      label="Writing model"
+      bind:value={modelId}
+      options={[
+        { value: "", label: `Choose a model` },
+        ...ready.map((model) => ({
+          value: model.id,
+          label: `${model.name} · ${model.provider === "openrouter" ? "Cloud" : "Local"}`,
+        })),
+      ]}
+    /></Field
   >
   {#if models.find((m) => m.id === modelId)?.provider === "openrouter"}<p class="caption muted">
       This request sends the current script context to OpenRouter.
     </p>{:else}<Badge tone="ready">Runs on your device</Badge>{/if}
   <Field label="Operation"
-    ><select aria-label="Draft operation" bind:value={operation}
-      ><option value="continue">Continue script</option><option value="new">New draft</option
-      ><option value="rewrite-selection" disabled={!selectedText}>Rewrite selection</option></select
-    ></Field
+    ><Select
+      label="Draft operation"
+      bind:value={operation}
+      options={[
+        { value: "continue", label: `Continue script` },
+        { value: "new", label: `New draft` },
+        { value: "rewrite-selection", label: `Rewrite selection`, disabled: !selectedText },
+      ]}
+    /></Field
   >
   <Field label="Instruction"
-    ><textarea
+    ><Textarea
       aria-label="AI instruction"
       bind:value={instruction}
-      placeholder="Make the language gentle, grounded and unhurried…"></textarea></Field
+      placeholder="Make the language gentle, grounded and unhurried…"
+    /></Field
   >
   <p class="caption muted">
     Context: current saved script{selectedText ? " and selected passage" : ""}.
