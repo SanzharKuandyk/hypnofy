@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS rewrite_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS installed_models(id TEXT PRIMARY KEY,name TEXT NOT NULL,record_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS suggestions(id TEXT PRIMARY KEY,script_id TEXT NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,record_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS render_records(id TEXT PRIMARY KEY,script_id TEXT NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,record_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS legacy_documents(source_table TEXT NOT NULL,source_id TEXT NOT NULL,original_json TEXT NOT NULL,PRIMARY KEY(source_table,source_id));
+CREATE TABLE IF NOT EXISTS job_history(id TEXT PRIMARY KEY,record_json TEXT NOT NULL);

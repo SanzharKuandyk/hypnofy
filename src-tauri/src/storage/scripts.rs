@@ -1,6 +1,28 @@
 use super::*;
 
 impl Store {
+    pub fn import_document(
+        &self,
+        collection: Option<&str>,
+        title: &str,
+        document: Value,
+        session: SessionSettings,
+        favorite: bool,
+        last_model_id: Option<String>,
+    ) -> Result<Script, String> {
+        session.validate()?;
+        let body = document::plain_text(&document)?;
+        let title = title.trim();
+        if title.is_empty() || title.chars().count() > 500 {
+            return Err("Use a title of 1–500 characters".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        let timestamp = now();
+        let conn = self.conn()?;
+        conn.execute("INSERT INTO scripts(id,collection_id,title,body,favorite,created_at,updated_at,deleted_at,revision,session_json,document_json,last_model_id) VALUES(?1,?2,?3,?4,?5,?6,?6,NULL,1,?7,?8,?9)",params![id,collection.unwrap_or("inbox"),title,body,favorite,timestamp,serde_json::to_string(&session).map_err(err)?,serde_json::to_string(&document).map_err(err)?,last_model_id]).map_err(err)?;
+        drop(conn);
+        self.get_script(&id)
+    }
     pub fn collections(&self, include_trash: bool) -> Result<Vec<Collection>, String> {
         let conn = self.conn()?;
         let deleted = if include_trash {
@@ -101,7 +123,7 @@ impl Store {
                     Some(value) => serde_json::from_str(&value).map_err(|error| rusqlite::Error::FromSqlConversionFailure(11, rusqlite::types::Type::Text, Box::new(error)))?,
                     None => document::from_plain_text(&r.get::<_, String>(4)?),
                 };
-                Ok(Script { id:r.get(0)?,collection_id:r.get(1)?,collection_name:r.get(2)?,title:r.get(3)?,body:r.get(4)?,document,last_model_id:r.get(12)?,favorite:r.get(5)?,created_at:r.get(6)?,updated_at:r.get(7)?,deleted_at:r.get(8)?,revision:r.get(9)?,session })
+                Ok(Script { id:r.get(0)?,collection_id:r.get(1)?,collection_name:r.get(2)?,title:r.get(3)?,body:r.get(4)?,content_hash:document::content_hash(&document),document,last_model_id:r.get(12)?,favorite:r.get(5)?,created_at:r.get(6)?,updated_at:r.get(7)?,deleted_at:r.get(8)?,revision:r.get(9)?,session })
             }
         ).optional().map_err(err)?.ok_or_else(|| "Script was not found".into())
     }
@@ -112,6 +134,8 @@ impl Store {
         title: Option<&str>,
         body: &str,
     ) -> Result<Script, String> {
+        let session =
+            SessionSettings::from_preferences(&self.preferences().map_err(|e| format!("{e:?}"))?);
         let conn = self.conn()?;
         let id = Uuid::new_v4().to_string();
         let timestamp = now();
@@ -120,7 +144,6 @@ impl Store {
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .unwrap_or("Untitled script");
-        let session = SessionSettings::default();
         let session_json = serde_json::to_string(&session).map_err(err)?;
         conn.execute(
             "INSERT INTO scripts(id,collection_id,title,body,favorite,created_at,updated_at,deleted_at,revision,session_json,document_json) VALUES(?1,?2,?3,?4,0,?5,?5,NULL,1,?6,?7)",
@@ -136,24 +159,41 @@ impl Store {
         if patch.title.trim().is_empty() {
             return Err("A script needs a title".into());
         }
-        if !(0.5..=2.0).contains(&patch.session.speed) {
-            return Err("Voice speed must be between 0.5× and 2×".into());
-        }
+        patch.session.validate()?;
         let body = document::plain_text(&patch.document)?;
         let document_json = serde_json::to_string(&patch.document).map_err(err)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction().map_err(err)?;
-        let current: (String, String, String, i64, Option<String>) = tx
+        let current: (String, String, String, i64, Option<String>, String, bool, Option<String>) = tx
             .query_row(
-                "SELECT title,body,session_json,revision,document_json FROM scripts WHERE id=?1",
+                "SELECT title,body,session_json,revision,document_json,collection_id,favorite,last_model_id FROM scripts WHERE id=?1",
                 [&patch.id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?)),
             )
             .optional()
             .map_err(err)?
             .ok_or_else(|| "Script was not found".to_string())?;
         if current.3 != patch.expected_revision {
             return Err("This script changed elsewhere. Reload it before saving.".into());
+        }
+        if current.0 == patch.title.trim()
+            && current.1 == body
+            && serde_json::from_str::<SessionSettings>(&current.2).map_err(err)? == patch.session
+            && current
+                .4
+                .as_deref()
+                .map(serde_json::from_str::<Value>)
+                .transpose()
+                .map_err(err)?
+                .as_ref()
+                == Some(&patch.document)
+            && current.5 == patch.collection_id
+            && current.6 == patch.favorite
+            && current.7 == patch.last_model_id
+        {
+            drop(tx);
+            drop(conn);
+            return self.get_script(&patch.id);
         }
         tx.execute(
             "INSERT INTO script_revisions(id,script_id,revision,title,body,session_json,saved_at,document_json) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
@@ -187,59 +227,18 @@ impl Store {
         )?;
         let conn = self.conn()?;
         conn.execute(
-            "UPDATE scripts SET document_json=?2,last_model_id=?3,session_json=?4 WHERE id=?1",
+            "UPDATE scripts SET document_json=?2,last_model_id=?3,session_json=?4,favorite=?5 WHERE id=?1",
             params![
                 duplicate.id,
-                serde_json::to_string(&source.document).map_err(err)?,
+                serde_json::to_string(&document::duplicate(source.document.clone()))
+                    .map_err(err)?,
                 source.last_model_id,
-                serde_json::to_string(&source.session).map_err(err)?
+                serde_json::to_string(&source.session).map_err(err)?,
+                source.favorite
             ],
         )
         .map_err(err)?;
         drop(conn);
         self.get_script(&duplicate.id)
-    }
-
-    pub fn set_deleted(&self, id: &str, deleted: bool) -> Result<(), String> {
-        let conn = self.conn()?;
-        let value = if deleted { Some(now()) } else { None };
-        if conn
-            .execute(
-                "UPDATE scripts SET deleted_at=?2,updated_at=?3 WHERE id=?1",
-                params![id, value, now()],
-            )
-            .map_err(err)?
-            != 1
-        {
-            return Err("Script was not found".into());
-        }
-        Ok(())
-    }
-
-    pub fn import_text(&self, source: &Path, collection: Option<&str>) -> Result<Script, String> {
-        let extension = source
-            .extension()
-            .and_then(|v| v.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if extension != "txt" && extension != "md" {
-            return Err("Only .txt and .md files can be imported".into());
-        }
-        let metadata = fs::metadata(source).map_err(err)?;
-        if metadata.len() > 2_000_000 {
-            return Err("The text file is larger than 2 MB".into());
-        }
-        let body = fs::read_to_string(source)
-            .map_err(|_| "The file is not valid UTF-8 text".to_string())?;
-        let title = source
-            .file_stem()
-            .and_then(|v| v.to_str())
-            .unwrap_or("Imported script");
-        self.create_script(collection, Some(title), &body)
-    }
-
-    pub fn export_text(&self, id: &str, destination: &Path) -> Result<(), String> {
-        let script = self.get_script(id)?;
-        fs::write(destination, script.body).map_err(err)
     }
 }

@@ -1,40 +1,52 @@
 # Hypnofy
 
-Windows desktop app for writing, organizing, and drafting hypnosis scripts. The library and editor work offline; narration is not configured in this release.
+Windows desktop application for writing, organizing, generating and narrating self-guided relaxation scripts. The rewritten interface follows the approved [Figma design](https://www.figma.com/design/gOLulpHyzRsG42fofiLCiC), with Dark as the default and Light/System options.
 
 ## Development
 
-Requirements: Node.js 22+, Rust 1.98+, WebView2, and Windows build tools.
+Requires Node.js 22+, Rust 1.98+, WebView2, Visual Studio C++ tools, the Vulkan SDK and Ninja at C:/DevTools/ninja.exe. The launcher discovers Visual Studio and the installed Vulkan SDK, initializes the x64 compiler environment, and uses the ignored short .b directory to avoid Windows native compiler path limits.
 
 ```powershell
 npm ci --ignore-scripts
-npm run check
-cargo check --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri dev
 ```
 
-The app stores user data under `%APPDATA%\app.hypnofy.desktop`. Ollama is optional and is reached only on `127.0.0.1:11434`. To build an installer, run `npm run tauri build` after the checks above.
+The Tauri wrapper builds the inference worker first. To produce a runnable development EXE with embedded UI:
 
-## Configuration
+```powershell
+npm run dev:exe
+```
 
-- The reviewed llama.cpp runtime asset lives in `src-tauri/assets/asset-manifest.json`. No speech engine or voice pack is installed by Hypnofy.
-- Linked GGUF files remain in their original locations. After linking, use **Verify** to load the file through the pinned llama.cpp runtime before it becomes selectable. The Models page also manages an optional OpenRouter key. The key is stored in Windows Credential Manager; scripts and model preferences stay in SQLite.
-- Tauri permissions live in `src-tauri/capabilities/default.json`; the frontend has no shell or general filesystem capability.
+Run .b/debug/Hypnofy-dev.exe from its build folder, keeping hypnofy-inference-worker.exe and native DLLs beside it. This is a debug build, with no installer or updater. Release packaging is intentionally disabled.
 
-## Code map
+## Features and storage
 
-- `src/App.svelte`: desktop shell, navigation, and save coordination.
-- `src/design/` and `src/components/`: palette and reusable controls.
-- `src/features/`: library, document editor, AI draft, models, and session views.
-- `src/bridge/`: typed frontend commands and data contracts.
-- `src-tauri/src/commands.rs`: typed Tauri command surface.
-- `src-tauri/src/config.rs`: reviewed asset manifest and user settings.
-- `src-tauri/src/storage/` and `document.rs`: SQLite migrations, revisions, linked models, and versioned script documents.
-- `src-tauri/src/models/`: Ollama, GGUF, OpenRouter, and the guarded OpenCode status.
-- `src-tauri/src/jobs.rs`: generation cancellation registry.
-- `src-tauri/src/speech.rs`: timing plan and future speech-provider interface.
+- Collections, favorites, search, bulk management, Trash/restore, permanent deletion and revisions.
+- TipTap writing with formatting, stable passage IDs, inline voice/pace overrides, explicit pauses and continuous passage groups. Serialized autosave preserves edits made during an in-flight save; conflicts offer recovery choices.
+- NobodyWho local GGUF text generation and Kokoro/Supertonic speech. OpenRouter text generation is optional and explicit. Suggestions are reviewed before an undoable insertion.
+- Managed model installation, verification, cancellation, folder scans and linking. Default model root is %USERPROFILE%/Models/Hypnofy. Linked models stay in place and Unlink never deletes them.
+- Passage previews, saved narration, native playback/seek, ambience, sleep timer, mono narration WAV and stereo mixed WAV export at 48 kHz/16-bit PCM.
+- UTF-8 TXT, Markdown and lossless versioned Hypnofy JSON import/export; bulk export publishes one new folder after every file succeeds.
+- Required launch acknowledgment, with the same information accessible from Settings/Help.
 
-OpenCode generation remains disabled until an installed version passes the isolated-profile and deny-all-tool checks. Cloud generation through OpenRouter is explicitly opt-in. Existing render records remain in storage, but this release does not create new narration audio.
+The application identifier remains app.hypnofy.desktop and Tauri resolves the existing application-data directory. SQLite migrations back up older databases before upgrading to schema 7. Unsupported legacy documents remain preserved and can be exported for recovery. Migration backups, scripts, revisions, pending suggestions, saved renders and user exports are persistent work.
 
-No automated tests were added for this refactor. Use `npm run check`, `cargo clippy --locked`, audits, and the manual acceptance flow before packaging.
+Windows Credential Manager stores the optional OpenRouter key. IPC only accepts credential writes and returns connection status. The frontend has no general filesystem or shell capability. Development tests use disposable application/WebView profiles and synthetic migration data; they do not inspect existing credentials or personal libraries.
 
+## Checks
+
+```powershell
+npm run check
+npm run lint
+npm run test
+npm run test:e2e
+npm run rpc:check
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+npm run native:lint
+npm run native:test
+npm run native:doc
+```
+
+The native wrappers run workspace Clippy with all targets/features and warnings denied, workspace tests, and shared-protocol documentation in the required VS/Ninja environment. Bindings are generated from Rust; rpc:check compares them without retaining temporary output.
+
+Routine tests use fake network/audio inputs and never download models or call paid providers. Explicit model smoke instructions and the architecture map are in [docs/rewrite-status.md](docs/rewrite-status.md).

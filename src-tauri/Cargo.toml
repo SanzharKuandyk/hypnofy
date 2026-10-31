@@ -4,10 +4,15 @@ version = "0.1.0"
 description = "A fast, private hypnosis script library and player"
 authors = ["Hypnofy"]
 edition = "2024"
+default-run = "hypnofy"
 
 [lib]
 name = "hypnofy_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[workspace]
+members = [".", "crates/inference-protocol", "crates/inference-worker"]
+resolver = "2"
 
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
@@ -27,3 +32,15 @@ tauri = { version = "=2.11.5", features = [] }
 tauri-plugin-dialog = "=2.7.3"
 tokio = { version = "=1.53.1", features = ["process", "rt-multi-thread", "time", "sync", "io-util", "fs"] }
 uuid = { version = "=1.26.1", features = ["v4"] }
+taurpc = "=0.8.2"
+specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.12"
+hypnofy-inference-protocol = { path = "crates/inference-protocol" }
+hound = "=3.5.1"
+rodio = { version = "=0.23.0", features = ["symphonia-all"] }
+tempfile = "=3.27.0"
+pulldown-cmark = "0.13"
+sysinfo = "0.37"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }

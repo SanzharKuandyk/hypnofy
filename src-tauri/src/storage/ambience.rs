@@ -1,4 +1,5 @@
 use super::*;
+use std::path::Path;
 
 impl Store {
     pub fn ambience(&self) -> Result<Vec<Ambience>, String> {
@@ -30,23 +31,35 @@ impl Store {
         if fs::metadata(source).map_err(err)?.len() > 1_000_000_000 {
             return Err("Audio files are limited to 1 GB".into());
         }
+        let decoder = rodio::Decoder::try_from(fs::File::open(source).map_err(err)?)
+            .map_err(|_| "The ambience file could not be decoded")?;
+        drop(decoder);
         let id = Uuid::new_v4().to_string();
         let destination = self
             .data_dir
             .join("audio/ambience")
             .join(format!("{id}.{ext}"));
-        fs::copy(source, &destination).map_err(err)?;
+        let mut temporary = tempfile::NamedTempFile::new_in(
+            destination.parent().ok_or("Invalid ambience directory")?,
+        )
+        .map_err(err)?;
+        std::io::copy(&mut fs::File::open(source).map_err(err)?, &mut temporary).map_err(err)?;
+        temporary.as_file().sync_all().map_err(err)?;
+        temporary.persist(&destination).map_err(err)?;
         let name = source
             .file_stem()
             .and_then(|v| v.to_str())
             .unwrap_or("Ambience")
             .to_string();
         let conn = self.conn()?;
-        conn.execute(
+        let result = conn.execute(
             "INSERT INTO ambience VALUES(?1,?2,?3,?4)",
             params![id, name, destination.to_string_lossy(), now()],
-        )
-        .map_err(err)?;
+        );
+        if let Err(error) = result {
+            let _ = fs::remove_file(&destination);
+            return Err(err(error));
+        }
         Ok(Ambience {
             id,
             name,

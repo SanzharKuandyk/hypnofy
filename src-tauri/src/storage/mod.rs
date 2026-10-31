@@ -1,15 +1,9 @@
-use crate::{config::AppSettings, document};
+use crate::document;
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{
-    fs,
-    io::Read,
-    path::{Path, PathBuf},
-    sync::Mutex,
-    time::Duration,
-};
+use std::{fs, path::PathBuf, sync::Mutex, time::Duration};
 use uuid::Uuid;
 
 pub struct Store {
@@ -17,21 +11,7 @@ pub struct Store {
     pub data_dir: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LinkedModel {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    #[serde(skip_serializing)]
-    pub verified_bytes: Option<i64>,
-    #[serde(skip_serializing)]
-    pub verified_mtime_ns: Option<i64>,
-    #[serde(skip_serializing)]
-    pub verified_runtime: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Collection {
     pub id: String,
@@ -39,7 +19,7 @@ pub struct Collection {
     pub script_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptSummary {
     pub id: String,
@@ -51,12 +31,13 @@ pub struct ScriptSummary {
     pub revision: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSettings {
-    pub voice: String,
+    pub voice_id: Option<String>,
     pub speed: f32,
-    pub paragraph_pause: f32,
+    pub paragraph_pause_ms: u32,
+    pub language: String,
     pub ambience_id: Option<String>,
     pub ambience_volume: f32,
     pub narration_volume: f32,
@@ -67,11 +48,12 @@ pub struct SessionSettings {
 impl Default for SessionSettings {
     fn default() -> Self {
         Self {
-            voice: String::new(),
-            speed: 0.9,
-            paragraph_pause: 2.0,
+            voice_id: None,
+            speed: 1.0,
+            paragraph_pause_ms: 2000,
+            language: "en-gb".into(),
             ambience_id: None,
-            ambience_volume: 0.063,
+            ambience_volume: 0.06,
             narration_volume: 1.0,
             ambience_mode: "loop".into(),
             sleep_minutes: None,
@@ -79,7 +61,35 @@ impl Default for SessionSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+impl SessionSettings {
+    pub fn from_preferences(preferences: &crate::domain::Preferences) -> Self {
+        Self {
+            voice_id: preferences.voice_id.clone(),
+            speed: preferences.speed,
+            paragraph_pause_ms: preferences.paragraph_pause_ms,
+            language: preferences.language.clone(),
+            narration_volume: preferences.narration_volume,
+            ambience_volume: preferences.ambience_volume,
+            ..Self::default()
+        }
+    }
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.speed.is_finite()
+            || !(0.5..=2.0).contains(&self.speed)
+            || self.paragraph_pause_ms > 30_000
+            || !self.ambience_volume.is_finite()
+            || !(0.0..=1.0).contains(&self.ambience_volume)
+            || !self.narration_volume.is_finite()
+            || !(0.0..=1.0).contains(&self.narration_volume)
+            || self.sleep_minutes.is_some_and(|m| m > 1440)
+        {
+            return Err("Narration settings are outside supported ranges".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Script {
     pub id: String,
@@ -87,6 +97,8 @@ pub struct Script {
     pub collection_name: String,
     pub title: String,
     pub body: String,
+    pub content_hash: String,
+    #[specta(type = crate::domain::JsonValue)]
     pub document: Value,
     pub last_model_id: Option<String>,
     pub favorite: bool,
@@ -97,11 +109,12 @@ pub struct Script {
     pub session: SessionSettings,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptPatch {
     pub id: String,
     pub title: String,
+    #[specta(type = crate::domain::JsonValue)]
     pub document: Value,
     pub last_model_id: Option<String>,
     pub collection_id: String,
@@ -111,21 +124,16 @@ pub struct ScriptPatch {
 }
 
 mod ambience;
-mod linked_models;
+mod rewrite;
 mod scripts;
-mod settings;
+mod session;
+#[cfg(test)]
+mod tests;
 
 impl Store {
     pub fn open(data_dir: PathBuf) -> anyhow::Result<Self> {
         fs::create_dir_all(&data_dir)?;
-        for dir in [
-            "audio/chunks",
-            "audio/ambience",
-            "models",
-            "engines",
-            "exports",
-            "downloads",
-        ] {
+        for dir in ["audio/chunks", "audio/ambience"] {
             fs::create_dir_all(data_dir.join(dir))?;
         }
         let path = data_dir.join("hypnofy.sqlite3");
@@ -135,13 +143,13 @@ impl Store {
             "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;",
         )?;
         let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version > 4 {
+        if version > 7 {
             anyhow::bail!("This library was created by a newer Hypnofy version");
         }
-        if version < 4 && version > 0 && path.exists() && path.metadata()?.len() > 0 {
+        if version < 7 && version > 0 && path.exists() && path.metadata()?.len() > 0 {
             connection.execute_batch("PRAGMA wal_checkpoint(FULL)")?;
             let backup_path = data_dir.join(format!(
-                "hypnofy-before-v4-{}.sqlite3",
+                "hypnofy-before-v7-{}.sqlite3",
                 Utc::now().format("%Y%m%d%H%M%S")
             ));
             let mut destination = Connection::open(backup_path)?;
@@ -230,8 +238,28 @@ impl Store {
                  PRAGMA user_version=4;",
             )?;
         }
+        if version < 5 {
+            rewrite::migrate(&tx)?;
+        }
+        if version < 6 {
+            tx.execute_batch(include_str!("../../migrations/0006_owned_staging.sql"))?;
+        }
+        if version < 7 {
+            rewrite::migrate_sessions(&tx)?;
+            tx.execute_batch(include_str!(
+                "../../migrations/0007_millisecond_settings.sql"
+            ))?;
+        }
         let now = now();
         tx.execute("INSERT OR IGNORE INTO collections(id,name,created_at,updated_at) VALUES('inbox','My scripts',?1,?1)", [&now])?;
+        let violation: Option<String> = tx
+            .query_row("PRAGMA foreign_key_check", [], |row| row.get(0))
+            .optional()?;
+        if violation.is_some() {
+            anyhow::bail!(
+                "The library contains invalid references. Migration was rolled back; its backup is preserved."
+            );
+        }
         tx.commit()?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -246,7 +274,7 @@ impl Store {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct Ambience {
     pub id: String,
     pub name: String,

@@ -1,0 +1,9 @@
+[package]
+name = "hypnofy-inference-worker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "=1.0.104"
+hypnofy-inference-protocol = { path = "../inference-protocol" }
+nobodywho = { git = "https://github.com/nobodywho-ooo/nobodywho.git", rev = "d045f3408e3dc9ffc0403220fe533a8fd29ec218" }

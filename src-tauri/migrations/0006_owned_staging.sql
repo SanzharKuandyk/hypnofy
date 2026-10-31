@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS owned_staging(id TEXT PRIMARY KEY,root TEXT NOT NULL,path TEXT NOT NULL);
+PRAGMA user_version=6;

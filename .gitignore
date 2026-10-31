@@ -1,5 +1,8 @@
 node_modules/
+.b/
 dist/
+test-results/
+playwright-report/
 src-tauri/target/
 .Codex/
 *.log
