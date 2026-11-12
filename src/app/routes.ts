@@ -4,6 +4,7 @@ export type SettingsSection = "appearance" | "providers" | "voice" | "storage" |
 
 export type Route =
   | { kind: "library"; view: LibraryView; collectionId: string | null }
-  | { kind: "script"; id: string }
+  | { kind: "script"; id: string; tab?: "narrate" }
   | { kind: "models" }
+  | { kind: "sounds"; returnToScriptId?: string; view?: "recordings" }
   | { kind: "settings"; section: SettingsSection };

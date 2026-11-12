@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import {
     ChevronLeft,
     Star,
@@ -12,15 +12,16 @@
     Copy,
     Trash2,
     History,
-    Link2,
+    Music2,
   } from "@lucide/svelte";
-  import { Button, Badge, Dialog, Field, Select, Input, Slider, NumberField } from "../shared/ui";
+  import { Button, Badge, Dialog, Field, Select, Input, Slider } from "../shared/ui";
   import { loadScriptEditor } from "../modules/editor";
   import type { EditorSelection } from "../modules/editor";
+  import { DeliveryPanel, NarrationText, RecordingDeleteDialog } from "../modules/narration";
   import { GenerationPanel } from "../modules/generation";
   import { StickyPlayer } from "../modules/playback";
   import { api } from "../shared/rpc/client";
-  import { chooseExport, chooseAmbience } from "../shared/platform/dialogs";
+  import { chooseAmbience, chooseExport } from "../shared/platform/dialogs";
   import { countWords, textOf } from "../domain/document";
   import { newJobId } from "../domain/ids";
   import type { DeliveryOverride } from "../domain/document";
@@ -31,14 +32,25 @@
     applySuggestion(text: string, replace: boolean, suggestion: Suggestion): void;
     applyDelivery(value: DeliveryOverride): void;
     makeContinuous(): void;
+    focusPassage(id: string): void;
+    requestAi(): void;
   }
 
   let { workspace: w }: { workspace: Workspace } = $props();
   const editorComponent = loadScriptEditor();
   let editorView = $state<EditorActions>();
+  let titleInput = $state<HTMLInputElement>();
   let tab = $state("write");
-  let panel = $state("outline");
-  let sheet = $state(false);
+  let soundOpen = $state(false);
+  let soundId = $state("");
+  let soundVolume = $state(0);
+  let soundSaving = $state(false);
+  let soundError = $state("");
+  let playerClosed = $state(false);
+  let recordingDeleteOpen = $state(false);
+  let recordingDeleteId = $state<string | null>(null);
+  let deliveryOpen = $state(false);
+  let aiOpen = $state(false);
   let menu = $state(false);
   let revisions = $state<RevisionRecord[]>([]);
   let revisionOpen = $state(false);
@@ -46,16 +58,14 @@
   let selection = $state<EditorSelection>({ text: "", anchor: null, range: null });
   let hasSelection = $state(false);
   let writingModel = $state("");
-  let overrideVoice = $state("");
-  let overrideSpeed = $state(0.85);
   let generationSequence = $state(0);
   let generationJobId = $state("");
   let renderJobId = $state("");
   let exportOpen = $state(false);
   let exportMixed = $state(false);
-  let ambienceId = $state("");
   let chosenRender = $state("");
   const script = $derived(w.editor.script);
+  const ambienceId = $derived(script?.session.ambienceId ?? null);
   const voices = $derived(
     w.models
       .filter((m) => m.capability === "speech" && m.status === "ready")
@@ -78,13 +88,15 @@
       renderJob?.state === "completed" &&
       id &&
       id !== playedPreview &&
-      w.renders.some((r) => r.id === id && r.preview)
+      w.renders.some((r) => r.id === id)
     ) {
       playedPreview = id;
       chosenRender = id;
+      playerClosed = false;
       void w.action(async () => {
         await api.playback.load(id);
-        await api.playback.control("play");
+        if (w.renders.some((r) => r.id === id && r.preview)) await api.playback.control("play");
+        await w.poll();
       });
     }
   });
@@ -104,15 +116,69 @@
           (model) => model.id === id && model.status === "ready" && model.capability === "text",
         ),
       ) ?? "";
-    ambienceId = w.editor.script?.session.ambienceId ?? "";
+    if (w.route.kind === "script" && w.route.tab === "narrate") tab = "narrate";
+    else if (!script?.title.trim() || script.title === "Untitled script") focusTitle();
   });
+
+  function focusTitle(): void {
+    titleInput?.focus();
+    titleInput?.select();
+  }
+
+  function openSound(): void {
+    if (!script) return;
+    soundId = script.session.ambienceId ?? "";
+    soundVolume = script.session.ambienceVolume ?? w.preferences?.ambienceVolume ?? 0.06;
+    soundError = "";
+    soundOpen = true;
+  }
+
+  async function importSound(): Promise<void> {
+    soundError = "";
+    soundSaving = true;
+    try {
+      const path = await chooseAmbience();
+      if (path) {
+        const sound = await api.playback.importAmbience(path);
+        w.ambience = [...w.ambience, sound];
+        soundId = sound.id;
+      }
+    } catch (value) {
+      soundError = value instanceof Error ? value.message : "Could not import audio.";
+    } finally {
+      soundSaving = false;
+    }
+  }
+
+  async function saveSound(): Promise<void> {
+    if (!script) return;
+    const ambienceId = soundId || null;
+    const ambienceVolume = soundVolume;
+    soundError = "";
+    soundSaving = true;
+    try {
+      w.editor.session({ ambienceId, ambienceVolume });
+      await w.editor.flush();
+      soundOpen = false;
+      if (w.renders.some((item) => item.id === w.playback?.renderId)) {
+        await w.action(async () => {
+          await api.playback.control("ambience-volume", ambienceVolume);
+          await api.playback.selectAmbience(ambienceId);
+          await w.poll();
+        });
+      }
+    } catch (value) {
+      soundError = value instanceof Error ? value.message : "Could not save background sound.";
+    } finally {
+      soundSaving = false;
+    }
+  }
 
   function ask(snapshot: EditorSelection): void {
     selection = snapshot;
     selectedText = snapshot.text;
-    panel = "ai";
+    aiOpen = true;
     generationSequence = w.editor.editSequence;
-    sheet = window.innerWidth < 1024;
   }
 
   async function generate(instruction: string, operation: string): Promise<void> {
@@ -152,7 +218,7 @@
       await w.editor.flush();
       await api.generation.discard(suggestion.id);
       w.suggestions = w.suggestions.filter((s) => s.id !== suggestion.id);
-      sheet = false;
+      aiOpen = false;
     });
   }
 
@@ -166,6 +232,7 @@
 
   async function play(): Promise<void> {
     if (!render) return;
+    playerClosed = false;
     if (w.playback?.renderId !== render.id) {
       await api.playback.load(render.id);
       if (script) {
@@ -199,137 +266,6 @@
   }
 </script>
 
-{#snippet delivery()}
-  {#if script}
-    <div class="row spread">
-      <h2>Delivery</h2>
-      <Badge>Local speech</Badge>
-    </div>
-    <p class="caption muted">Start with script defaults, then shape individual passages.</p>
-    <Field label="Script voice"
-      ><Select
-        label="Script voice"
-        value={script.session.voiceId}
-        onchange={(value) => w.editor.session({ voiceId: value || null })}
-        options={[
-          { value: "", label: `Choose a voice` },
-          ...voices.map((voice) => ({
-            value: voice.id,
-            label: `${voice.name} · ${voice.language}`,
-          })),
-        ]}
-      /></Field
-    >
-    {#if !voices.length}<p class="caption muted">Install a speech model to enable voices.</p>
-      <Button onclick={() => w.action(() => w.navigate({ kind: "models" }))}>Get a voice</Button
-      >{/if}
-    <Field label={`Script pace · ${(script.session.speed ?? 1).toFixed(2)}×`}
-      ><Slider
-        label="Script pace"
-        min={0.5}
-        max={2}
-        step={0.05}
-        value={script.session.speed ?? 1}
-        onchange={(value) => w.editor.session({ speed: Number(value) })}
-      /></Field
-    >
-    <Field label="Paragraph pause · seconds"
-      ><NumberField
-        label="Paragraph pause"
-        min={0}
-        max={30}
-        step={0.5}
-        value={script.session.paragraphPauseMs / 1000}
-        onchange={(value) =>
-          w.editor.session({
-            paragraphPauseMs: Math.round(Number(value) * 1000),
-          })}
-      /></Field
-    >
-    <hr style="border:0;border-top:1px solid var(--line);width:100%" />
-    <h3>{hasSelection ? "Selected text" : "Current passage"}</h3>
-    <Field label="Voice override"
-      ><Select
-        label="Passage voice"
-        bind:value={overrideVoice}
-        options={[
-          { value: "", label: `Inherit script voice` },
-          ...voices.map((voice) => ({ value: voice.id, label: `${voice.name}` })),
-        ]}
-      /></Field
-    >
-    <Field label={`Pace override · ${overrideSpeed.toFixed(2)}×`}
-      ><Slider
-        label="Passage pace"
-        min={0.5}
-        max={2}
-        step={0.05}
-        bind:value={overrideSpeed}
-      /></Field
-    >
-    <Button
-      onclick={() => {
-        editorView?.applyDelivery({ voiceId: overrideVoice || null, speed: overrideSpeed });
-        sheet = false;
-      }}>Apply to {hasSelection ? "selection" : "passage"}</Button
-    >
-    <Button
-      variant="ghost"
-      onclick={() => editorView?.applyDelivery({ voiceId: null, speed: null })}
-      >Reset to script defaults</Button
-    >
-    <Button variant="ghost" onclick={() => editorView?.makeContinuous()}
-      ><Link2 size={15} />Make selection continuous</Button
-    >
-    <p class="caption muted">
-      Continuous delivery removes extra paragraph gaps. Natural speech pauses remain.
-    </p>
-    <hr style="border:0;border-top:1px solid var(--line);width:100%" />
-    <Field label="Ambience"
-      ><Select
-        label="Ambience track"
-        bind:value={ambienceId}
-        onchange={() =>
-          w.action(async () => {
-            w.editor.session({ ambienceId: ambienceId || null });
-            await api.playback.selectAmbience(ambienceId || null);
-          })}
-        options={[
-          { value: "", label: `None` },
-          ...w.ambience.map((ambient) => ({ value: ambient.id, label: `${ambient.name}` })),
-        ]}
-      /></Field
-    >
-    <Button
-      variant="ghost"
-      onclick={() =>
-        w.action(async () => {
-          const path = await chooseAmbience();
-          if (path) {
-            await api.playback.importAmbience(path);
-            await w.refresh();
-          }
-        })}>Import ambience</Button
-    >
-    <Field label="Ambience volume"
-      ><Slider
-        label="Ambience volume"
-        min={0}
-        max={1}
-        step={0.01}
-        value={w.playback?.ambienceVolume ?? script.session.ambienceVolume ?? 0.06}
-        onchange={(value) => {
-          const volume = Number(value);
-          w.editor.session({ ambienceVolume: volume });
-          void w.action(async () => {
-            await api.playback.control("ambience-volume", volume);
-          });
-        }}
-      /></Field
-    >
-  {/if}
-{/snippet}
-
 {#snippet ai()}
   <GenerationPanel
     models={w.models}
@@ -347,38 +283,11 @@
         w.suggestions = w.suggestions.filter((s) => s.id !== id);
       })}
     onclose={() => {
-      panel = "delivery";
-      sheet = false;
+      aiOpen = false;
     }}
     {stale}
+    error={w.error}
   />
-{/snippet}
-
-{#snippet outline()}
-  <span class="caption muted">ON THIS PAGE</span>
-  {#each w.editor.document.content.filter((block) => block.type === "heading") as heading (heading.attrs?.id)}<Button
-      variant="ghost"
-      onclick={() =>
-        document
-          .querySelector(`[data-block-id="${CSS.escape(heading.attrs?.id ?? "")}"]`)
-          ?.scrollIntoView({ block: "center" })}>{textOf(heading)}</Button
-    >{/each}
-  <hr style="border:0;border-top:1px solid var(--line);width:100%" />
-  <h3>Writing is the starting point.</h3>
-  <p class="muted">Select a passage to rewrite with AI or set how it should be spoken.</p>
-  <Button
-    onclick={() => {
-      tab = "narrate";
-      panel = "delivery";
-    }}>Open narration</Button
-  >
-  <hr style="border:0;border-top:1px solid var(--line);width:100%" />
-  <span class="caption muted">SCRIPT DETAILS</span>
-  <p class="caption muted">
-    {countWords(w.editor.document)} words<br />{w.editor.document.content.filter(
-      (block) => block.type === "heading",
-    ).length} sections<br />Saved on this device
-  </p>
 {/snippet}
 
 {#if script}
@@ -398,25 +307,23 @@
         w.action(async () => {
           await w.editor.flush();
           tab = "narrate";
-          panel = "delivery";
         })}><Mic size={15} />Narrate</Button
     ><span class="push"></span><Button
       variant="ghost"
-      class="icon"
       aria-label="Favorite this script"
+      class="icon script-favorite"
       onclick={() => w.editor.metadata({ favorite: !script.favorite })}
       ><Star size={17} fill={script.favorite ? "currentColor" : "none"} /></Button
     ><Button
       variant="ghost"
       aria-label="Open delivery panel"
       onclick={() => {
-        panel = "delivery";
-        sheet = window.innerWidth < 1024;
-      }}><SlidersHorizontal size={16} /><span class="desktop-only">Delivery</span></Button
-    ><Button
-      variant="ghost"
-      aria-label="Open AI panel"
-      onclick={() => ask({ text: "", anchor: null, range: null })}><Sparkles size={16} /></Button
+        deliveryOpen = true;
+      }}><SlidersHorizontal size={16} /><span class="desktop-only">Voice & timing</span></Button
+    ><Button variant="ghost" aria-label="Open AI panel" onclick={() => editorView?.requestAi()}
+      ><Sparkles size={16} /><span class="desktop-only">Write with AI</span></Button
+    ><Button variant="ghost" aria-label="Background sound" class="script-sounds" onclick={openSound}
+      ><Music2 size={16} /><span class="desktop-only">Sounds</span></Button
     ><Button variant="ghost" class="icon" aria-label="Script actions" onclick={() => (menu = true)}
       ><MoreHorizontal size={18} /></Button
     >
@@ -453,6 +360,7 @@
         </div>
         <Input
           class="title-input"
+          bind:element={titleInput}
           aria-label="Script title"
           value={script.title}
           oninput={(value) => w.editor.title(value)}
@@ -473,6 +381,18 @@
           </div>
         </div>
         <div class="toolbar">
+          <Button
+            onclick={() =>
+              w.action(() =>
+                w.navigate({ kind: "sounds", returnToScriptId: script.id, view: "recordings" }),
+              )}>Manage recordings</Button
+          >
+          {#if playerClosed && render}<Button onclick={() => (playerClosed = false)}
+              >Show player</Button
+            >{/if}
+          <Button onclick={() => (deliveryOpen = true)}>Voice & timing</Button><Button
+            onclick={openSound}><Music2 size={15} />Background sound</Button
+          >
           {#if render && foreignPlayback}<Button
               onclick={() =>
                 w.action(async () => {
@@ -497,10 +417,15 @@
           >
             {renderJob.error.message}
           </p>{/if}{#if render}<div class="row">
-            <Badge tone={render.revision === script.revision ? "ready" : "warning"}
-              >{render.revision === script.revision
-                ? "Ready to listen"
-                : "Audio from an earlier revision"}</Badge
+            <Badge
+              tone={render.revision === script.revision && render.pipelineVersion === 2
+                ? "ready"
+                : "warning"}
+              >{render.pipelineVersion !== 2
+                ? "Re-render to apply the updated pause pipeline"
+                : render.revision === script.revision
+                  ? "Ready to listen"
+                  : "Audio from an earlier revision"}</Badge
             ><Select
               label="Saved narration"
               value={render.id}
@@ -544,34 +469,30 @@
                 variant="ghost"
                 onclick={() => {
                   tab = "write";
-                  panel = "delivery";
-                  sheet = window.innerWidth < 1024;
+                  void tick().then(() => {
+                    if (block.attrs?.id) editorView?.focusPassage(block.attrs.id);
+                    deliveryOpen = true;
+                  });
                 }}>Edit delivery</Button
               >
             </div>
-            <p>{textOf(block)}</p>
+            <p><NarrationText text={textOf(block)} /></p>
           </article>{/each}{#if !render}<p class="muted">
             Render a narration to listen or export. Your previous successful audio stays available
             when you make changes.
           </p>{/if}
       </div>{/if}
-    <aside
-      class="inspector"
-      aria-label={panel === "ai"
-        ? "AI assistant"
-        : panel === "outline"
-          ? "Page outline"
-          : "Delivery inspector"}
-    >
-      {#if panel === "ai"}{@render ai()}{:else if panel === "outline"}{@render outline()}{:else}{@render delivery()}{/if}
-    </aside>
   </div>
   <div class="editor-status">
     <span>{countWords(w.editor.document)} words · Revision {script.revision}</span><span
       aria-live="polite">{w.editor.status}</span
     >
   </div>
-  {#if (tab === "narrate" || render) && !foreignPlayback}<StickyPlayer
+  {#if tab === "write" && render && render.pipelineVersion !== 2}<div class="render-warning">
+      <span>This audio uses the older pause pipeline. Re-render to hear the updated timing.</span
+      ><Button variant="ghost" onclick={() => (tab = "narrate")}>Open narration</Button>
+    </div>{/if}
+  {#if (tab === "narrate" || render) && !foreignPlayback && !playerClosed}<StickyPlayer
       state={w.playback}
       {render}
       onplay={() => w.action(play)}
@@ -583,15 +504,85 @@
           await w.poll();
         })}
       onexport={() => (exportOpen = true)}
+      onclose={() =>
+        w.action(async () => {
+          playerClosed = true;
+          await api.playback.control("unload");
+          await w.refreshAudio();
+        })}
+      ondelete={() => {
+        recordingDeleteId = render?.id ?? null;
+        recordingDeleteOpen = true;
+      }}
     />{/if}
 {/if}
-<Dialog bind:open={sheet} title={panel === "ai" ? "Write with AI" : "Delivery"}
-  >{#if panel === "ai"}{@render ai()}{:else}{@render delivery()}{/if}<Button
-    onclick={() => (sheet = false)}>Done</Button
-  ></Dialog
+<RecordingDeleteDialog
+  id={recordingDeleteId}
+  bind:open={recordingDeleteOpen}
+  onchanged={() => w.refreshAudio()}
+  onremoved={() => {
+    playerClosed = true;
+    chosenRender = "";
+    w.notify("Recording deleted");
+  }}
+/>
+<Dialog bind:open={aiOpen} title="Write with AI" class="ai-modal">{@render ai()}</Dialog>
+<Dialog bind:open={soundOpen} title="Background sound" required={soundSaving}>
+  <Field label="Sound">
+    <Select
+      label="Sound for this script"
+      bind:value={soundId}
+      disabled={soundSaving}
+      options={[
+        { value: "", label: "No background sound" },
+        ...w.ambience.map((sound) => ({ value: sound.id, label: sound.name })),
+      ]}
+    />
+  </Field>
+  {#if soundId}
+    <Field label={`Volume · ${Math.round(soundVolume * 100)}%`}>
+      <Slider label="Background sound volume" bind:value={soundVolume} disabled={soundSaving} />
+    </Field>
+  {/if}
+  {#if soundError}<p class="inline-error" role="alert">{soundError}</p>{/if}
+  <div class="actions">
+    <Button variant="ghost" disabled={soundSaving} onclick={importSound}>Import audio</Button>
+    <Button disabled={soundSaving} onclick={() => (soundOpen = false)}>Cancel</Button>
+    <Button variant="primary" loading={soundSaving} onclick={saveSound}>Save sound</Button>
+  </div>
+</Dialog>
+<Dialog bind:open={deliveryOpen} title="Voice & timing" class="delivery-modal"
+  >{#if script}<DeliveryPanel
+      session={script.session}
+      {voices}
+      {hasSelection}
+      onscript={(patch) => w.editor.session(patch)}
+      onapply={(value) => editorView?.applyDelivery(value)}
+      oncontinuous={() => editorView?.makeContinuous()}
+      onclose={() => (deliveryOpen = false)}
+    />{/if}</Dialog
 >
 <Dialog bind:open={menu} title="Script actions"
   ><Button
+    onclick={() => {
+      menu = false;
+      openSound();
+    }}><Music2 size={16} />Background sound</Button
+  >
+  <Button
+    onclick={async () => {
+      menu = false;
+      tab = "write";
+      await tick();
+      focusTitle();
+    }}>Rename script</Button
+  >
+  <Button
+    onclick={() => {
+      if (script) w.editor.metadata({ favorite: !script.favorite });
+    }}><Star size={16} />Toggle favorite</Button
+  >
+  <Button
     onclick={() =>
       w.action(async () => {
         if (!script) return;

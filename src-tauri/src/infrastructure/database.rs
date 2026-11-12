@@ -38,8 +38,9 @@ impl Database {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let thread = std::thread::Builder::new()
             .name("hypnofy-database".into())
-            .spawn(move || match Store::open(path) {
+            .spawn(move || match Store::open(path.clone()) {
                 Ok(store) => {
+                    let _ = crate::application::recordings::recover_orphaned_audio(&store, &path);
                     let _ = crate::application::cleanup::recover_installations(&store, false);
                     let recovered = store
                         .recover_jobs()

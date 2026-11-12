@@ -48,7 +48,7 @@ pub async fn run(app: App, request: DraftRequest, job: Job) -> Result<String, St
         "Operation: {}\nInstruction: {}\nCurrent script:\n{}\nSelected text:\n{}",
         request.operation, request.instruction, body, request.selected_text
     );
-    let system = "Write a thoughtful self-guided relaxation script. Use gentle invitations, no medical claims, and no tool calls. Return only the requested script text.";
+    let system = "Write a thoughtful self-guided relaxation script. Use gentle invitations, no medical claims, and no tool calls. Return only the requested script text. Write timed silence only as [pause:5s] with the intended numeric seconds (0.5–120). Do not write spoken stage directions such as 'pause 5 seconds'.";
     if prompt.len() > 60000 {
         return Err("This script is too long for the selected generation context. Select a smaller passage.".into());
     }

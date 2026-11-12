@@ -20,9 +20,11 @@ pub enum Command {
     Play,
     Pause,
     Stop,
+    Unload,
     Seek(u32),
     Volume(f32),
-    Ambience(Option<PathBuf>),
+    Ambience(Option<(String, PathBuf)>),
+    PreviewAmbience(Option<(String, PathBuf)>),
     AmbienceVolume(f32),
     Sleep(Option<u32>),
     Barrier(tokio::sync::oneshot::Sender<PlaybackState>),
@@ -39,6 +41,8 @@ impl Audio {
         let (sender, receiver) = mpsc::channel();
         let state = Arc::new(Mutex::new(PlaybackState {
             render_id: None,
+            ambience_id: None,
+            preview_ambience_id: None,
             playing: false,
             position_ms: 0,
             duration_ms: 0,
@@ -55,16 +59,18 @@ impl Audio {
                 let mut device = None;
                 let mut player: Option<Player> = None;
                 let mut ambience: Option<Player> = None;
+                let mut preview: Option<Player> = None;
                 let mut deadline: Option<Instant> = None;
                 let failed=Arc::new(AtomicBool::new(false));
                 let mut remembered:Option<PathBuf>=None;
                 let mut timeline:Vec<RenderPassage>=Vec::new();
                 loop {
                     if failed.swap(false,Ordering::SeqCst){
+                        if let Some(p)=preview.take(){p.stop();}
                         if let Some(p)=player.take(){p.stop();}
                         if let Some(a)=ambience.take(){a.stop();}
                         device=None;
-                        if let Ok(mut state)=snapshot.lock(){state.playing=false;state.error=Some("The audio device was disconnected. Choose an output device and press Play to reconnect.".into());}
+                        if let Ok(mut state)=snapshot.lock(){state.playing=false;state.preview_ambience_id=None;state.error=Some("The audio device was disconnected. Choose an output device and press Play to reconnect.".into());}
                     }
                     let command = match receiver.recv_timeout(Duration::from_millis(100)) {
                         Ok(c) => Some(c),
@@ -80,6 +86,8 @@ impl Audio {
                                     duration_ms,
                                     passages,
                                 } => {
+                                    if let Some(p)=preview.take(){p.stop();}
+                                    snapshot.lock().map_err(|_| "Playback unavailable")?.preview_ambience_id=None;
                                     if device.is_none() {
                                         device =
                                             Some(open_device(failed.clone())?);
@@ -112,6 +120,8 @@ impl Audio {
                                     s.error = None;
                                 }
                                 Command::Play => {
+                                    if let Some(p)=preview.take(){p.stop();}
+                                    snapshot.lock().map_err(|_| "Playback unavailable")?.preview_ambience_id=None;
                                     if player.as_ref().is_none_or(Player::empty) {
                                         let path=remembered.as_ref().ok_or("Choose a completed render")?;
                                         if device.is_none(){device=Some(open_device(failed.clone())?);}
@@ -139,6 +149,8 @@ impl Audio {
                                         false;
                                 }
                                 Command::Stop => {
+                                    if let Some(p)=preview.take(){p.stop();}
+                                    snapshot.lock().map_err(|_| "Playback unavailable")?.preview_ambience_id=None;
                                     if let Some(p) = &player {
                                         p.pause();
                                         let _ = p.try_seek(Duration::ZERO);
@@ -150,6 +162,24 @@ impl Audio {
                                         snapshot.lock().map_err(|_| "Playback unavailable")?;
                                     s.playing = false;
                                     s.position_ms = 0;
+                                }
+                                Command::Unload => {
+                                    if let Some(p)=player.take(){p.stop();}
+                                    if let Some(p)=ambience.take(){p.stop();}
+                                    if let Some(p)=preview.take(){p.stop();}
+                                    remembered=None;
+                                    timeline.clear();
+                                    deadline=None;
+                                    let mut state=snapshot.lock().map_err(|_|"Playback unavailable")?;
+                                    state.render_id=None;
+                                    state.ambience_id=None;
+                                    state.preview_ambience_id=None;
+                                    state.playing=false;
+                                    state.position_ms=0;
+                                    state.duration_ms=0;
+                                    state.sleep_remaining_ms=None;
+                                    state.current_block_ids.clear();
+                                    state.error=None;
                                 }
                                 Command::Seek(ms) => {
                                     player
@@ -169,7 +199,8 @@ impl Audio {
                                     if let Some(old) = ambience.take() {
                                         old.stop();
                                     }
-                                    if let Some(path) = path {
+                                    snapshot.lock().map_err(|_| "Playback unavailable")?.ambience_id=path.as_ref().map(|(id,_)|id.clone());
+                                    if let Some((_,path)) = path {
                                         if device.is_none() {
                                             device = Some(
                                                 open_device(failed.clone())?,
@@ -202,10 +233,26 @@ impl Audio {
                                         ambience = Some(p);
                                     }
                                 }
+                                Command::PreviewAmbience(track) => {
+                                    if let Some(p)=preview.take(){p.stop();}
+                                    snapshot.lock().map_err(|_|"Playback unavailable")?.preview_ambience_id=None;
+                                    if let Some((id,path))=track {
+                                        if let Some(p)=&player{p.pause();}
+                                        if let Some(a)=&ambience{a.pause();}
+                                        snapshot.lock().map_err(|_|"Playback unavailable")?.playing=false;
+                                        if device.is_none(){device=Some(open_device(failed.clone())?);}
+                                        let p=Player::connect_new(device.as_ref().ok_or("Audio unavailable")?.mixer());
+                                        p.set_volume(snapshot.lock().map_err(|_|"Playback unavailable")?.ambience_volume);
+                                        p.append(Decoder::try_from(std::fs::File::open(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?);
+                                        preview=Some(p);
+                                        snapshot.lock().map_err(|_|"Playback unavailable")?.preview_ambience_id=Some(id);
+                                    }
+                                }
                                 Command::AmbienceVolume(volume) => {
                                     if let Some(a) = &ambience {
                                         a.set_volume(volume);
                                     }
+                                    if let Some(p)=&preview{p.set_volume(volume);}
                                     snapshot
                                         .lock()
                                         .map_err(|_| "Playback unavailable")?
@@ -223,6 +270,10 @@ impl Audio {
                             }
                         }
                         let mut s = snapshot.lock().map_err(|_| "Playback unavailable")?;
+                        if preview.as_ref().is_some_and(Player::empty) {
+                            preview=None;
+                            s.preview_ambience_id=None;
+                        }
                         if let Some(p) = &player {
                             s.position_ms =
                                 p.get_pos().as_millis().min(u128::from(u32::MAX)) as u32;
@@ -248,8 +299,11 @@ impl Audio {
                                 if let Some(a) = &ambience {
                                     a.set_volume(s.ambience_volume * fade);
                                 }
+                                if let Some(p) = &preview { p.set_volume(s.ambience_volume * fade); }
                             }
                             if remaining == 0 {
+                                if let Some(p) = preview.take() { p.stop(); }
+                                s.preview_ambience_id = None;
                                 if let Some(p) = &player {
                                     p.pause();
                                     p.set_volume(s.volume);

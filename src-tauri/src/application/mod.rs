@@ -4,3 +4,4 @@ pub mod generation;
 pub mod markdown;
 pub mod models;
 pub mod narration;
+pub mod recordings;

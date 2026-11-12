@@ -3,6 +3,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+pub mod cues;
+
 pub const DOCUMENT_VERSION: u64 = 2;
 
 pub fn from_plain_text(body: &str) -> Value {

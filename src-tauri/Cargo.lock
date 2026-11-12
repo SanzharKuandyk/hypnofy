@@ -2568,6 +2568,7 @@ dependencies = [
  "hypnofy-inference-protocol",
  "keyring-core",
  "pulldown-cmark",
+ "regex",
  "reqwest",
  "rodio",
  "rusqlite",

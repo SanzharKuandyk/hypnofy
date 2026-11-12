@@ -155,6 +155,73 @@ pub struct CatalogEntry {
     pub description: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
+pub enum HubCompatibility {
+    Catalog { catalog_id: String },
+    Candidate { reason: String },
+    BrowseOnly { reason: String },
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HubModel {
+    pub repository: String,
+    pub task: Option<String>,
+    pub library: Option<String>,
+    pub downloads: String,
+    pub likes: String,
+    pub license: Option<String>,
+    pub updated_at: Option<String>,
+    pub gated: bool,
+    pub compatibility: HubCompatibility,
+    pub tags: Vec<String>,
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HubSearch {
+    pub query: String,
+    pub task: String,
+    pub sort: String,
+    pub cursor: Option<String>,
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HubPage {
+    pub models: Vec<HubModel>,
+    pub next_cursor: Option<String>,
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HubFile {
+    pub path: String,
+    pub bytes: Option<String>,
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HubDetail {
+    pub model: HubModel,
+    pub revision: String,
+    pub languages: Vec<String>,
+    pub files: Vec<HubFile>,
+    pub files_truncated: bool,
+    pub description: Option<String>,
+    pub readme: Option<String>,
+}
+
 #[taurpc::ipc_type]
 #[derive(Debug)]
 #[serde(rename_all = "camelCase")]
@@ -344,7 +411,33 @@ pub struct RenderRecord {
     pub created_at: String,
     pub preview: bool,
     #[serde(default)]
+    pub pipeline_version: u32,
+    #[serde(default)]
     pub passages: Vec<RenderPassage>,
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredRecording {
+    pub render: RenderRecord,
+    pub script_title: String,
+    pub script_status: String,
+    pub pending_deletion: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum RecordingRemoval {
+    Removed,
+    Pending { message: String },
+}
+
+#[taurpc::ipc_type]
+#[derive(Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryMutation {
+    pub pending_audio_deletions: u32,
 }
 
 #[taurpc::ipc_type]
@@ -361,6 +454,8 @@ pub struct RenderPassage {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackState {
     pub render_id: Option<String>,
+    pub ambience_id: Option<String>,
+    pub preview_ambience_id: Option<String>,
     pub playing: bool,
     pub position_ms: u32,
     pub duration_ms: u32,

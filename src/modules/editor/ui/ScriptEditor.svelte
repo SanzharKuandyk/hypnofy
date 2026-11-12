@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Popover } from "bits-ui";
   import { Editor, Extension, Mark, Node } from "@tiptap/core";
   import { StarterKit } from "@tiptap/starter-kit";
   import { ListItem } from "@tiptap/extension-list";
@@ -19,9 +20,11 @@
     Link2,
     Undo2,
     Redo2,
+    Ellipsis,
   } from "@lucide/svelte";
   import { Button, Select, NumberField } from "../../../shared/ui";
   import { decodeDocument } from "../../../domain/document";
+  import { documentFromDraft } from "../../../domain/pause-cues";
   import type { ScriptDocument, DeliveryOverride } from "../../../domain/document";
 
   let {
@@ -173,15 +176,7 @@
 
   export function applySuggestion(text: string, replace: boolean, suggestion: Suggestion): void {
     if (!editor) throw new Error("The editor is unavailable");
-    const content = text
-      .trim()
-      .split(/\n\n+/)
-      .filter((text) => text.length > 0)
-      .map((text) => ({
-        type: "paragraph",
-        attrs: { id: crypto.randomUUID() },
-        content: [{ type: "text", text }],
-      }));
+    const content = documentFromDraft(text).content;
     const range = suggestion.range;
     const from = range ? position(range.from) : selectedFrom;
     const to = range
@@ -201,6 +196,20 @@
         content,
       )
       .run();
+  }
+
+  export function focusPassage(id: string): void {
+    editor?.state.doc.descendants((node, position) => {
+      if (node.attrs.id === id && node.isTextblock) {
+        editor
+          ?.chain()
+          .focus()
+          .setTextSelection({ from: position + 1, to: position + 1 + node.content.size })
+          .run();
+        return false;
+      }
+      return true;
+    });
   }
 
   export function applyDelivery(value: DeliveryOverride): void {
@@ -260,6 +269,10 @@
     slash = false;
   }
 
+  export function requestAi(): void {
+    void ask();
+  }
+
   async function ask(): Promise<void> {
     if (!editor) return;
     selectedFrom = editor.state.selection.from;
@@ -317,11 +330,26 @@
       ],
       editorProps: {
         attributes: { class: "prose", "aria-label": "Script body", spellcheck: "true" },
+        handlePaste: (_view, event) => {
+          const text = event.clipboardData?.getData("text/plain");
+          if (event.clipboardData?.getData("text/html")) return false;
+          if (!text || !/(?:pause|silence|break)\s*(?::|for)?\s*\d/i.test(text)) return false;
+          try {
+            editor?.chain().focus().insertContent(documentFromDraft(text).content).run();
+            return true;
+          } catch {
+            return false;
+          }
+        },
       },
       onUpdate: ({ editor: instance }) =>
         onchange(decodeDocument({ ...instance.getJSON(), version: 2 })),
       onSelectionUpdate: ({ editor: instance }) => {
-        paragraphStyle = instance.isActive("heading", {level:2}) ? "2" : instance.isActive("heading", {level:3}) ? "3" : "text";
+        paragraphStyle = instance.isActive("heading", { level: 2 })
+          ? "2"
+          : instance.isActive("heading", { level: 3 })
+            ? "3"
+            : "text";
         const { from, to } = instance.state.selection;
         const node = instance.state.doc.nodeAt(from);
         if (
@@ -344,7 +372,28 @@
   });
 </script>
 
-<div class="toolbar editor-formatting" aria-label="Text formatting">
+<div class="editor-formatting" aria-label="Text formatting">
+  <Select
+    label="Paragraph style"
+    bind:value={paragraphStyle}
+    style="width:130px"
+    onclose={() => editor?.commands.focus()}
+    onchange={(value) => {
+      if (value === "2" || value === "3")
+        editor
+          ?.chain()
+          .focus()
+          .setHeading({ level: value === "2" ? 2 : 3 })
+          .run();
+      else editor?.chain().focus().setParagraph().run();
+    }}
+    options={[
+      { value: "text", label: "Paragraph" },
+      { value: "2", label: "Heading 2" },
+      { value: "3", label: "Heading 3" },
+    ]}
+  />
+  <span class="toolbar-divider"></span>
   <Button
     variant="ghost"
     class="icon"
@@ -359,68 +408,35 @@
     aria-label="Italic"
     onclick={() => editor?.chain().focus().toggleItalic().run()}><Italic size={16} /></Button
   >
-  <Button
-    variant="ghost"
-    class="icon"
-    title="Strikethrough"
-    aria-label="Strikethrough"
-    onclick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough size={16} /></Button
-  >
-  <Select
-    label="Paragraph style"
-    onclose={() => editor?.commands.focus()}
-    style="width:118px"
-    onchange={(value) => {
-      const level = value;
-      if (level === "2" || level === "3")
-        editor
-          ?.chain()
-          .focus()
-          .setHeading({ level: level === "2" ? 2 : 3 })
-          .run();
-      else editor?.chain().focus().setParagraph().run();
-    }}
-    bind:value={paragraphStyle}
-    options={[
-      { value: "text", label: `Text` },
-      { value: "2", label: `Heading 2` },
-      { value: "3", label: `Heading 3` },
-    ]}
-  />
-  <Button
-    variant="ghost"
-    class="icon"
-    title="List"
-    aria-label="List"
-    onclick={() => editor?.chain().focus().toggleBulletList().run()}><List size={18} /></Button
-  >
-  <Button
-    variant="ghost"
-    class="icon"
-    aria-label="Numbered list"
-    title="Numbered list"
-    onclick={() => editor?.chain().focus().toggleOrderedList().run()}
-    ><ListOrdered size={18} /></Button
-  >
-  <Button
-    variant="ghost"
-    class="icon"
-    aria-label="Undo"
-    title="Undo"
-    onclick={() => editor?.chain().focus().undo().run()}><Undo2 size={16} /></Button
-  >
-  <Button
-    variant="ghost"
-    class="icon"
-    aria-label="Redo"
-    title="Redo"
-    onclick={() => editor?.chain().focus().redo().run()}><Redo2 size={16} /></Button
-  >
+  <span class="toolbar-divider"></span>
   <Button variant="ghost" onclick={() => (pauseOpen = !pauseOpen)}><Plus size={15} />Pause</Button>
-  <Button variant="ghost" title="Make selected passages continuous" onclick={makeContinuous}
-    ><Link2 size={15} />Continuous</Button
+  <Popover.Root
+    ><Popover.Trigger class="button ghost icon" aria-label="More formatting"
+      ><Ellipsis size={18} /></Popover.Trigger
+    ><Popover.Portal
+      ><Popover.Content class="formatting-popover" sideOffset={8} collisionPadding={12}>
+        <Button variant="ghost" onclick={() => editor?.chain().focus().toggleStrike().run()}
+          ><Strikethrough size={16} />Strikethrough</Button
+        >
+        <Button variant="ghost" onclick={() => editor?.chain().focus().toggleBulletList().run()}
+          ><List size={16} />Bullet list</Button
+        >
+        <Button variant="ghost" onclick={() => editor?.chain().focus().toggleOrderedList().run()}
+          ><ListOrdered size={16} />Numbered list</Button
+        >
+        <Button variant="ghost" onclick={makeContinuous}
+          ><Link2 size={16} />Continuous passages</Button
+        >
+        <Button variant="ghost" onclick={() => editor?.chain().focus().undo().run()}
+          ><Undo2 size={16} />Undo</Button
+        >
+        <Button variant="ghost" onclick={() => editor?.chain().focus().redo().run()}
+          ><Redo2 size={16} />Redo</Button
+        >
+        <Button variant="ghost" onclick={ask}><Sparkles size={16} />Rewrite with AI</Button>
+      </Popover.Content></Popover.Portal
+    ></Popover.Root
   >
-  <Button variant="ghost" onclick={ask}><Sparkles size={15} />Ask AI</Button>
 </div>
 {#if pauseOpen}<div class="row">
     <label for="pause-seconds">Pause in seconds</label><NumberField

@@ -9,6 +9,7 @@
     required = false,
     children,
     wide = false,
+    class: className = "",
   }: {
     open?: boolean;
     title: string;
@@ -16,6 +17,7 @@
     required?: boolean;
     children: Snippet;
     wide?: boolean;
+    class?: string;
   } = $props();
 </script>
 
@@ -23,7 +25,7 @@
   <Dialog.Portal>
     <Dialog.Overlay class="modal-backdrop" />
     <Dialog.Content
-      class={`modal ${wide ? "wide" : ""}`}
+      class={`modal ${wide ? "wide" : ""} ${className}`}
       onEscapeKeydown={(event) => {
         if (required) event.preventDefault();
       }}

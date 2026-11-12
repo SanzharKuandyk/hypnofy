@@ -2,6 +2,13 @@ use super::*;
 
 #[taurpc::procedures(path = "narration")]
 pub trait Narration {
+    async fn library<R: tauri::Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> ApiResult<Vec<StoredRecording>>;
+    async fn remove<R: tauri::Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        id: String,
+    ) -> ApiResult<RecordingRemoval>;
     async fn plan<R: tauri::Runtime>(
         app_handle: tauri::AppHandle<R>,
         script_id: String,
@@ -31,6 +38,25 @@ pub struct NarrationImpl;
 
 #[taurpc::resolvers]
 impl Narration for NarrationImpl {
+    async fn library<R: tauri::Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> ApiResult<Vec<StoredRecording>> {
+        app_handle
+            .state::<App>()
+            .db
+            .call(|s| s.recording_library())
+            .await
+    }
+    async fn remove<R: tauri::Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        id: String,
+    ) -> ApiResult<RecordingRemoval> {
+        let state = app_handle.state::<App>();
+        state.require_entry()?;
+        application::recordings::remove(&state, id).await
+    }
     async fn plan<R: tauri::Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
@@ -100,6 +126,11 @@ impl Narration for NarrationImpl {
         job_id: String,
     ) -> ApiResult<String> {
         let state = app_handle.state::<App>();
+        state.require_entry()?;
+        let id = render_id.clone();
+        if !state.db.call(move |s| s.can_export_render(&id)).await? {
+            return Err("This recording was deleted or is pending deletion".into());
+        }
         let source = render_path(&state, &render_id)?;
         let ambience = if let Some(id) = ambience_id {
             Some(

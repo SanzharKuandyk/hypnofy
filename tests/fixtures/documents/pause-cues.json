@@ -1,0 +1,57 @@
+[
+  {
+    "text": "Breathe.\npause 5 seconds\nRest.",
+    "pauses": [5000],
+    "speech": "Breathe.\n\nRest."
+  },
+  {
+    "text": "🌙 Breathe [PAUSE: 2.5s] gently.",
+    "pauses": [2500],
+    "speech": "🌙 Breathe  gently."
+  },
+  {
+    "text": "First (pause for 1 second) then [silence 3 seconds] rest.",
+    "pauses": [1000, 3000],
+    "speech": "First  then  rest."
+  },
+  {
+    "text": "You can pause 5 seconds before you answer.",
+    "pauses": [],
+    "speech": "You can pause 5 seconds before you answer."
+  },
+  {
+    "text": "Pause: 120 seconds.",
+    "pauses": [120000],
+    "speech": ""
+  },
+  {
+    "text": "[pause 200 seconds]",
+    "invalid": true
+  },
+  {
+    "text": "pause 0.1 seconds",
+    "invalid": true
+  },
+  {
+    "text": "Breathe.\r\nPause for 5 seconds\r\nRest.",
+    "pauses": [5000],
+    "speech": "Breathe.\r\n\nRest."
+  },
+  {
+    "text": "[pause 0.49999 seconds]",
+    "invalid": true
+  },
+  {
+    "text": "[pause five seconds]",
+    "invalid": true
+  },
+  {
+    "text": "pause 2 minutes",
+    "invalid": true
+  },
+  {
+    "text": "Pause and notice your breathing.",
+    "pauses": [],
+    "speech": "Pause and notice your breathing."
+  }
+]

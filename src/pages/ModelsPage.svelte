@@ -14,6 +14,7 @@
   } from "@lucide/svelte";
   import { Button, Badge, Dialog, Field, Select } from "../shared/ui";
   import { api } from "../shared/rpc/client";
+  import { ModelExplorer } from "../modules/models";
   import { newJobId } from "../domain/ids";
   import { chooseGguf, chooseModelFolder } from "../shared/platform/dialogs";
   import type { Workspace } from "../app/workflows/workspace.svelte";
@@ -65,7 +66,7 @@
       <h1>Models & voices</h1>
       <p>The tools behind your words. Run them on your device.</p>
     </div>
-    <Button variant="primary" onclick={() => (tab = "catalog")}
+    <Button variant="primary" onclick={() => (tab = "explore")}
       ><Download size={16} />Browse models</Button
     >
   </header>
@@ -74,7 +75,11 @@
       variant={tab === "installed" ? "secondary" : "ghost"}
       onclick={() => (tab = "installed")}>Installed models</Button
     ><Button variant={tab === "catalog" ? "secondary" : "ghost"} onclick={() => (tab = "catalog")}
-      >Model catalog</Button
+      >Supported downloads</Button
+    ><Button
+      variant={tab === "explore" ? "secondary" : "ghost"}
+      aria-pressed={tab === "explore"}
+      onclick={() => (tab = "explore")}>Explore Hugging Face</Button
     ><span class="push"></span><Button
       onclick={() => {
         relinkId = null;
@@ -138,7 +143,8 @@
                     ? (w.preferences?.voiceId ?? "")
                     : ""}
                   style="width:260px"
-                  onchange={(value) => w.action(() => w.savePreferences({ voiceId: value || null }))}
+                  onchange={(value) =>
+                    w.action(() => w.savePreferences({ voiceId: value || null }))}
                   options={[
                     { value: "", label: `Set default voice…` },
                     ...model.voices.map((voice) => ({
@@ -181,6 +187,14 @@
         <p>Install a writing model and a voice, or link files you already have.</p>
         <Button variant="primary" onclick={() => (tab = "catalog")}>Explore models</Button>
       </div>{/if}
+  {:else if tab === "explore"}<ModelExplorer
+      oninstall={async (id) => {
+        await w.action(async () => {
+          plan = await api.models.plan(id);
+          installOpen = true;
+        });
+      }}
+    />
   {:else}<p class="muted">
       Downloads go to your chosen model folder. Review the source, license and size before
       installing.

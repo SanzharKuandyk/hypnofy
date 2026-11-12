@@ -2,6 +2,59 @@ use super::*;
 use std::path::Path;
 
 impl Store {
+    pub fn rename_ambience(&self, id: &str, name: &str) -> Result<(), String> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 80 {
+            return Err("Use a sound name of 1–80 characters".into());
+        }
+        if self
+            .conn()?
+            .execute("UPDATE ambience SET name=?2 WHERE id=?1", params![id, name])
+            .map_err(err)?
+            != 1
+        {
+            return Err("Sound not found".into());
+        }
+        Ok(())
+    }
+
+    pub fn remove_ambience(&self, id: &str) -> Result<(), String> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction().map_err(err)?;
+        let used: bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM scripts WHERE json_extract(session_json,'$.ambienceId')=?1 UNION ALL SELECT 1 FROM script_revisions WHERE json_extract(session_json,'$.ambienceId')=?1)",[id],|r|r.get(0)).map_err(err)?;
+        if used {
+            return Err("This sound is used by a script or saved revision. Keep it to preserve that session.".into());
+        }
+        let path: String = tx
+            .query_row("SELECT path FROM ambience WHERE id=?1", [id], |r| r.get(0))
+            .map_err(err)?;
+        let path = std::path::PathBuf::from(path);
+        let owned = self
+            .data_dir
+            .join("audio/ambience")
+            .canonicalize()
+            .map_err(err)?;
+        if path
+            .parent()
+            .ok_or("Invalid sound path")?
+            .canonicalize()
+            .map_err(err)?
+            != owned
+            || path.file_stem().and_then(|s| s.to_str()) != Some(id)
+            || fs::symlink_metadata(&path)
+                .map_err(err)?
+                .file_type()
+                .is_symlink()
+        {
+            return Err("Sound ownership could not be verified".into());
+        }
+        tx.execute("DELETE FROM ambience WHERE id=?1", [id])
+            .map_err(err)?;
+        fs::remove_file(&path)
+            .map_err(|_| "The sound is in use. Stop playback or export and retry.")?;
+        tx.commit().map_err(err)
+    }
+
     pub fn ambience(&self) -> Result<Vec<Ambience>, String> {
         let conn = self.conn()?;
         let mut stmt = conn

@@ -29,6 +29,9 @@ Run .b/debug/Hypnofy-dev.exe from its build folder, keeping hypnofy-inference-wo
 - UTF-8 TXT, Markdown and lossless versioned Hypnofy JSON import/export; bulk export publishes one new folder after every file succeeds.
 - Required launch acknowledgment, with the same information accessible from Settings/Help.
 - Shared dark/light selectors and popup lists, text/password fields, bounded steppers, sliders, checkboxes, progress and tooltips. Keyboard interaction and narrow-window popup placement are covered by component and native UI tests.
+- Focused AI review with pinned actions, progressive voice/timing controls, neutral charcoal surfaces with lime accents, and a compact writing toolbar.
+- A reusable sound library with import, preview, rename, script assignment and background volume. Its Recordings tab lists saved narration and audio retained in Trash; recordings can be deleted independently. Close player unloads playback. Trashing a script unloads its recording; permanent deletion reclaims its owned audio, preserving exported WAV files.
+- Public Hugging Face model search with task/sort filters, pagination, model-card text, file sizes and revision-specific source links. Qwen3-TTS and other architectures can be researched without implying runtime support. Supported downloads remain a separate verified catalog. Explicit written pause directions compile into silence; older WAVs are marked for re-rendering.
 
 The application identifier remains app.hypnofy.desktop and Tauri resolves the existing application-data directory. SQLite migrations back up older databases before upgrading to schema 7. Unsupported legacy documents remain preserved and can be exported for recovery. Migration backups, scripts, revisions, pending suggestions, saved renders and user exports are persistent work.
 

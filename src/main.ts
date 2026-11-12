@@ -4,6 +4,8 @@ import "@fontsource/inter/600.css";
 import "@fontsource/lora/400.css";
 import "./shared/theme/tokens.css";
 import "./shared/theme/controls.css";
+import "./shared/theme/workspaces.css";
+import "./shared/theme/libraries.css";
 import App from "./app/App.svelte";
 import { mount } from "svelte";
 import { initializeTheme } from "./shared/theme/theme";

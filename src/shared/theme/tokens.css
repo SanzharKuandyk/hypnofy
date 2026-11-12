@@ -1,24 +1,24 @@
 :root {
   color-scheme: dark;
-  --paper: #1d211e;
-  --sidebar: #181b19;
-  --surface: #242a26;
-  --subtle: #202622;
-  --text: #e5eae5;
-  --muted: #a6b0a9;
-  --line: #39423b;
-  --control: #68776c;
-  --accent: #9acbaa;
-  --accent-ink: #14251b;
-  --tint: #293f31;
+  --paper: #141414;
+  --sidebar: #101010;
+  --surface: #1d1d20;
+  --subtle: #19191b;
+  --text: #f0f0f2;
+  --muted: #a2a2ab;
+  --line: #333338;
+  --control: #686873;
+  --accent: #b4f477;
+  --accent-ink: #142008;
+  --tint: #252c21;
   --danger: #f2aaa3;
   --danger-bg: #402b2b;
   --amber: #e9c684;
   --amber-bg: #3d3424;
   --radius: 8px;
   --sidebar-width: 240px;
-  --scroll-thumb: #64766a;
-  --scroll-thumb-hover: #8b9e90;
+  --scroll-thumb: #666670;
+  --scroll-thumb-hover: #9999a3;
   font-family: Inter, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.55;
@@ -28,23 +28,23 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --paper: #fcfcfa;
-  --sidebar: #f3f4f0;
+  --paper: #fafafa;
+  --sidebar: #f1f1f2;
   --surface: #fff;
-  --subtle: #f7f8f5;
-  --text: #262b28;
-  --muted: #68716b;
-  --line: #e2e6df;
-  --control: #859488;
-  --accent: #365c49;
+  --subtle: #f5f5f6;
+  --text: #242428;
+  --muted: #676770;
+  --line: #dedee3;
+  --control: #85858e;
+  --accent: #426c21;
   --accent-ink: #fff;
-  --tint: #e8f0e9;
+  --tint: #edf4e7;
   --danger: #a63c36;
   --danger-bg: #faeeec;
   --amber: #8b6624;
   --amber-bg: #f5efdf;
-  --scroll-thumb: #7f8d83;
-  --scroll-thumb-hover: #5f7265;
+  --scroll-thumb: #85858e;
+  --scroll-thumb-hover: #65656f;
 }
 * {
   box-sizing: border-box;
@@ -751,25 +751,25 @@ small,
 }
 .theme-preview {
   height: 86px;
-  background: #1d211e;
-  border-left: 42px solid #181b19;
+  background: #141414;
+  border-left: 42px solid #101010;
   padding: 16px;
   display: grid;
   gap: 8px;
 }
 .theme-preview.light {
-  background: #fcfcfa;
-  border-left-color: #f3f4f0;
+  background: #fafafa;
+  border-left-color: #f1f1f2;
 }
 .theme-preview i {
   display: block;
-  background: #a6b0a9;
+  background: #a2a2ab;
   height: 5px;
   max-width: 100px;
   border-radius: 4px;
 }
 .theme-preview.light i {
-  background: #68716b;
+  background: #676770;
 }
 .editor-toolbar {
   display: flex;

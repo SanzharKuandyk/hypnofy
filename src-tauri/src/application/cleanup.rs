@@ -50,6 +50,17 @@ pub async fn cleanup(app: &App) -> ApiResult<()> {
     app.inference.release().await.map_err(error)?;
     recover_staging(&app.root, true).map_err(error)?;
     app.db.call(|s| recover_installations(s, true)).await?;
+    let root = app.root.clone();
+    let pending = app
+        .db
+        .call(move |s| super::recordings::recover_deletions(s, &root))
+        .await?;
+    if pending > 0 {
+        return Err(
+            "Some recordings are still in use. Close other audio applications and retry cleanup."
+                .into(),
+        );
+    }
     let retained = app.db.call(|s| s.retained_render_ids()).await?;
     let playing = app
         .audio
@@ -111,18 +122,38 @@ fn remove_installation_staging(id: &str, root: &Path, path: &Path) -> Result<(),
         .map_err(|_| "Owned staging files are in use. Try cleanup again later.".into())
 }
 
+/// Reclaims cached speech only after publishers are stopped, preserving all registered renders.
+pub(super) fn reclaim_speech_cache(store: &crate::storage::Store, root: &Path) -> ApiResult<()> {
+    let retained = store
+        .recording_library()?
+        .into_iter()
+        .map(|r| r.render.id)
+        .collect();
+    for path in audio_candidates(root, &retained, None).map_err(error)? {
+        if path
+            .parent()
+            .and_then(Path::file_name)
+            .is_some_and(|name| name == "chunks")
+        {
+            std::fs::remove_file(path).map_err(error)?;
+        }
+    }
+    Ok(())
+}
+
 fn audio_candidates(
     root: &Path,
     retained: &HashSet<String>,
     playing: Option<&str>,
 ) -> Result<Vec<PathBuf>, String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
     let mut candidates = Vec::new();
     let mut units = HashSet::new();
-    for directory in ["audio/renders", "audio/previews"] {
-        let directory = root
-            .join(directory)
-            .canonicalize()
-            .map_err(|e| e.to_string())?;
+    for leaf in ["renders", "previews"] {
+        let directory = root.join("audio").join(leaf);
+        if directory.canonicalize().map_err(|e| e.to_string())? != directory {
+            return Err("Audio storage must remain inside its owned directory".into());
+        }
         for entry in std::fs::read_dir(&directory).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
@@ -156,7 +187,11 @@ fn audio_candidates(
             }
         }
     }
-    for entry in std::fs::read_dir(root.join("audio/chunks")).map_err(|e| e.to_string())? {
+    let chunks = root.join("audio").join("chunks");
+    if chunks.canonicalize().map_err(|e| e.to_string())? != chunks {
+        return Err("Speech cache must remain inside its owned directory".into());
+    }
+    for entry in std::fs::read_dir(chunks).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         if entry.file_type().map_err(|e| e.to_string())?.is_file()
@@ -203,7 +238,8 @@ mod tests {
     #[test]
     fn saved_and_playing_audio_stay_protected_while_orphans_are_reclaimed() {
         let directory = tempfile::tempdir().unwrap();
-        let root = directory.path();
+        let canonical_root = directory.path().canonicalize().unwrap();
+        let root = canonical_root.as_path();
         for path in ["audio/renders", "audio/previews", "audio/chunks"] {
             std::fs::create_dir_all(root.join(path)).unwrap();
         }

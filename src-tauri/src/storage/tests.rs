@@ -16,6 +16,52 @@ fn patch(script: &Script, text: &str) -> ScriptPatch {
 }
 
 #[test]
+fn sound_library_preserves_originals_and_referenced_audio() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("original.wav");
+    let mut writer = hound::WavWriter::create(
+        &source,
+        hound::WavSpec {
+            channels: 1,
+            sample_rate: 48000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        },
+    )
+    .unwrap();
+    for _ in 0..480 {
+        writer.write_sample(0_i16).unwrap();
+    }
+    writer.finalize().unwrap();
+    let store = Store::open(directory.path().join("workspace")).unwrap();
+    let sound = store.import_ambience(&source).unwrap();
+    assert!(source.exists());
+    assert_ne!(source, std::path::PathBuf::from(&sound.path));
+    store.rename_ambience(&sound.id, "Evening piano").unwrap();
+    assert_eq!(store.ambience().unwrap()[0].name, "Evening piano");
+    let script = store.create_script(None, None, "Breathe.").unwrap();
+    let mut change = patch(&script, "Breathe.");
+    change.session.ambience_id = Some(sound.id.clone());
+    store.update_script(change).unwrap();
+    assert!(store.remove_ambience(&sound.id).is_err());
+    assert!(std::path::Path::new(&sound.path).exists());
+    let unused = store.import_ambience(&source).unwrap();
+    store.remove_ambience(&unused.id).unwrap();
+    assert!(!std::path::Path::new(&unused.path).exists());
+    assert!(source.exists());
+    store
+        .conn()
+        .unwrap()
+        .execute(
+            "INSERT INTO ambience VALUES('foreign','Foreign',?1,'test')",
+            [source.to_string_lossy()],
+        )
+        .unwrap();
+    assert!(store.remove_ambience("foreign").is_err());
+    assert!(source.exists());
+}
+
+#[test]
 fn optimistic_revisions_duplicate_trash_and_atomic_bulk() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path().into()).unwrap();

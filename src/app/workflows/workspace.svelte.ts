@@ -171,32 +171,38 @@ export class Workspace {
     await this.editor.flush();
     if (sequence !== this.navigationSequence) return;
     if (route.kind === "script") {
-      const script = await api.scripts.get(route.id);
+      const [script, suggestions, renders] = await Promise.all([
+        api.scripts.get(route.id),
+        api.generation.suggestions(route.id),
+        api.narration.renders(route.id),
+      ]);
       if (sequence !== this.navigationSequence) return;
       try {
         this.editor.load(script);
       } catch (value) {
         if (await api.scripts.legacyDocument(route.id)) {
+          if (sequence !== this.navigationSequence) return;
           this.recovery = script;
           this.recoveryOpen = true;
           return;
         }
         throw value;
       }
-      [this.suggestions, this.renders] = await Promise.all([
-        api.generation.suggestions(route.id),
-        api.narration.renders(route.id),
-      ]);
+      this.suggestions = suggestions;
+      this.renders = renders;
     }
     this.route = route;
     await this.refreshLibrary();
   }
 
   async createScript(): Promise<void> {
+    const sequence = ++this.navigationSequence;
     await this.editor.flush();
+    if (sequence !== this.navigationSequence) return;
     const script = await api.scripts.create(
       this.route.kind === "library" ? this.route.collectionId : null,
     );
+    if (sequence !== this.navigationSequence) return;
     if (this.preferences) {
       script.session.voiceId = this.preferences.voiceId;
       script.session.speed = this.preferences.speed;
@@ -208,6 +214,7 @@ export class Workspace {
     this.editor.load(script);
     this.editor.changed();
     await this.editor.flush();
+    if (sequence !== this.navigationSequence) return;
     this.route = { kind: "script", id: script.id };
     this.suggestions = [];
     this.renders = [];
@@ -216,14 +223,22 @@ export class Workspace {
 
   async bulk(ids: string[], operation: string, collectionId: string | null = null): Promise<void> {
     await this.editor.flush();
-    await api.scripts.bulk({ ids, operation, collectionId });
+    const result = await api.scripts.bulk({ ids, operation, collectionId });
+    await this.refreshAudio();
     await this.refreshLibrary();
     this.notify(
-      operation === "trash"
-        ? "Moved to Trash. Restore it from Trash at any time."
-        : "Library updated",
+      result.pendingAudioDeletions
+        ? "Script deleted. Locked audio removal is pending and will retry at startup or cleanup."
+        : operation === "trash"
+          ? "Moved to Trash. Restore it from Trash at any time."
+          : "Library updated",
     );
     this.undoTrash = operation === "trash" ? [...ids] : [];
+  }
+
+  async refreshAudio(): Promise<void> {
+    this.playback = await api.playback.state();
+    if (this.editor.script) this.renders = await api.narration.renders(this.editor.script.id);
   }
 
   async importScript(): Promise<void> {
@@ -244,6 +259,22 @@ export class Workspace {
       await api.scripts.exportFile(id, path);
       this.notify("Script exported");
     }
+  }
+
+  async renameScript(id: string, title: string): Promise<void> {
+    await this.editor.flush();
+    const script = await api.scripts.get(id);
+    await api.scripts.save({
+      id,
+      title: title.trim(),
+      document: script.document,
+      collectionId: script.collectionId,
+      favorite: script.favorite,
+      expectedRevision: script.revision,
+      session: script.session,
+      lastModelId: script.lastModelId,
+    });
+    await this.refreshLibrary();
   }
 
   async exportRecovery(): Promise<void> {

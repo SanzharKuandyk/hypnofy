@@ -2,6 +2,18 @@ use super::*;
 
 #[taurpc::procedures(path = "models")]
 pub trait Models {
+    async fn open_source<R: tauri::Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        url: String,
+    ) -> ApiResult<()>;
+    async fn search<R: tauri::Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        request: HubSearch,
+    ) -> ApiResult<HubPage>;
+    async fn detail<R: tauri::Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        repository: String,
+    ) -> ApiResult<HubDetail>;
     async fn usage<R: tauri::Runtime>(
         app_handle: tauri::AppHandle<R>,
         id: String,
@@ -45,6 +57,35 @@ pub struct ModelsImpl;
 
 #[taurpc::resolvers]
 impl Models for ModelsImpl {
+    async fn open_source<R: tauri::Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        url: String,
+    ) -> ApiResult<()> {
+        crate::infrastructure::external_links::model_source(&url)?;
+        if !app_handle.state::<App>().test_mode {
+            tokio::task::spawn_blocking(move || {
+                crate::infrastructure::external_links::open_model_source(&url)
+            })
+            .await
+            .map_err(|_| AppError::from("The browser launcher stopped unexpectedly"))??;
+        }
+        Ok(())
+    }
+    async fn search<R: tauri::Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        request: HubSearch,
+    ) -> ApiResult<HubPage> {
+        app_handle.state::<App>().model_hub.search(request).await
+    }
+    async fn detail<R: tauri::Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        repository: String,
+    ) -> ApiResult<HubDetail> {
+        app_handle.state::<App>().model_hub.detail(repository).await
+    }
     async fn usage<R: tauri::Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,

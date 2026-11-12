@@ -124,6 +124,7 @@ pub struct ScriptPatch {
 }
 
 mod ambience;
+mod recordings;
 mod rewrite;
 mod scripts;
 mod session;

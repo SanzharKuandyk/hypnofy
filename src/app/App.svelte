@@ -4,6 +4,7 @@
   import { Button, Dialog, Field, TooltipProvider, Input, Progress } from "../shared/ui";
   import { EntryNotice } from "../modules/entry";
   import { StickyPlayer } from "../modules/playback";
+  import { RecordingDeleteDialog } from "../modules/narration";
   import { chooseExport } from "../shared/platform/dialogs";
   import { api } from "../shared/rpc/client";
   import { Workspace } from "./workflows/workspace.svelte";
@@ -15,6 +16,8 @@
   let collectionOpen = $state(false);
   let collectionName = $state("");
   let closeError = $state(false);
+  let recordingDeleteOpen = $state(false);
+  let recordingDeleteId = $state<string | null>(null);
   const currentJobs = $derived(
     w.jobs.filter((j) => ["queued", "running", "cancelling"].includes(j.state)),
   );
@@ -89,7 +92,9 @@
               ? (w.editor.script?.title ?? "Script")
               : w.route.kind === "models"
                 ? "Models & voices"
-                : "Settings"}</span
+                : w.route.kind === "sounds"
+                  ? "Sound library"
+                  : "Settings"}</span
         ><span class="status"
           ><ShieldCheck size={14} /><span class="desktop-only">Local workspace</span></span
         >
@@ -114,6 +119,8 @@
                 workspace={w}
                 oncollection={() => (collectionOpen = true)}
               />{/key}{:else if w.route.kind === "models"}{#await import("../pages/ModelsPage.svelte") then component}<component.default
+                workspace={w}
+              />{/await}{:else if w.route.kind === "sounds"}{#await import("../pages/SoundsPage.svelte") then component}<component.default
                 workspace={w}
               />{/await}{:else}{#await import("../pages/SettingsPage.svelte") then component}<component.default
                 workspace={w}
@@ -151,9 +158,24 @@
               if (path && w.playback?.renderId)
                 await api.narration.export(w.playback.renderId, path, null);
             })}
+          onclose={() =>
+            w.action(async () => {
+              await api.playback.control("unload");
+              await w.refreshAudio();
+            })}
+          ondelete={() => {
+            recordingDeleteId = w.playback?.renderId ?? null;
+            recordingDeleteOpen = true;
+          }}
         />{/if}
     </main>
   </div>
+  <RecordingDeleteDialog
+    id={recordingDeleteId}
+    bind:open={recordingDeleteOpen}
+    onchanged={() => w.refreshAudio()}
+    onremoved={() => w.notify("Recording deleted")}
+  />
   {#if w.notice}<EntryNotice
       bind:open={w.notice}
       onaccept={() => w.accept()}

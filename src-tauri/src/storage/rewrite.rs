@@ -350,8 +350,9 @@ impl Store {
                 "delete"=> {
                     let deleted:bool=tx.query_row("SELECT deleted_at IS NOT NULL FROM scripts WHERE id=?1",[&id],|r|r.get(0)).map_err(|e|AppError::from(e.to_string()))?;
                     if !deleted {return Err("Only scripts in Trash can be permanently deleted".into());}
+                    tx.execute("INSERT OR REPLACE INTO rewrite_settings(key,value) SELECT 'render-delete:'||id,record_json FROM render_records WHERE script_id=?1",[&id]).map_err(|e|AppError::from(e.to_string()))?;
                     tx.execute("DELETE FROM renders WHERE script_id=?1",[&id]).map_err(|e|AppError::from(e.to_string()))?;
-                    tx.execute("DELETE FROM render_records WHERE script_id=?1",[&id]).map_err(|e|AppError::from(e.to_string()))?;
+                    // The queue retains the manifest when script deletion cascades its render rows.
                     tx.execute("DELETE FROM suggestions WHERE script_id=?1",[&id]).map_err(|e|AppError::from(e.to_string()))?;
                     tx.execute("DELETE FROM scripts WHERE id=?1",[&id])
                 },

@@ -29,7 +29,7 @@ pub trait Scripts {
     async fn bulk<R: tauri::Runtime>(
         app_handle: tauri::AppHandle<R>,
         request: BulkRequest,
-    ) -> ApiResult<()>;
+    ) -> ApiResult<LibraryMutation>;
     async fn revisions<R: tauri::Runtime>(
         app_handle: tauri::AppHandle<R>,
         id: String,
@@ -178,10 +178,10 @@ impl Scripts for ScriptsImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         request: BulkRequest,
-    ) -> ApiResult<()> {
+    ) -> ApiResult<LibraryMutation> {
         let state = app_handle.state::<App>();
         state.require_entry()?;
-        state.db.call(move |s| s.bulk(request)).await
+        application::recordings::mutate_scripts(&state, request).await
     }
     async fn revisions<R: tauri::Runtime>(
         self,

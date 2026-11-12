@@ -73,6 +73,7 @@ pub fn passage_document(document: &Value, ids: &[String]) -> Result<Value, Strin
 
 pub fn compile(script: &Script) -> Result<Vec<Unit>, String> {
     document::plain_text(&script.document)?;
+    let normalized = document::cues::normalize(&script.document)?;
     let mut units = Vec::new();
     let mut previous_group: Option<String> = None;
     let mut pending: Option<(u32, bool)> = None;
@@ -86,7 +87,7 @@ pub fn compile(script: &Script) -> Result<Vec<Unit>, String> {
         }
     }
     let mut flat = Vec::new();
-    blocks(&script.document, &mut flat);
+    blocks(&normalized, &mut flat);
     for block in flat {
         let block_id = block["attrs"]["id"]
             .as_str()
@@ -393,6 +394,7 @@ pub async fn render(
         duration_ms: (frames / 48).min(u64::from(u32::MAX)) as u32,
         created_at: Utc::now().to_rfc3339(),
         preview,
+        pipeline_version: 2,
         passages,
     };
     let manifest = serde_json::json!({"record":record,"units":used});
@@ -478,6 +480,26 @@ mod tests {
                 ..Default::default()
             },
         }
+    }
+
+    #[test]
+    fn written_pause_instructions_become_silence_before_synthesis() {
+        let doc = document::from_plain_text("Breathe.\npause 5 seconds\nRest.");
+        let plan = compile(&fixture(doc)).unwrap();
+        assert!(matches!(&plan[0], Unit::Speech { text, .. } if text.trim() == "Breathe."));
+        assert!(matches!(
+            &plan[1],
+            Unit::Silence {
+                duration_ms: 5000,
+                ..
+            }
+        ));
+        assert!(matches!(&plan[2], Unit::Speech { text, .. } if text.trim() == "Rest."));
+        assert!(
+            !plan
+                .iter()
+                .any(|u| matches!(u, Unit::Speech {text,..} if text.contains("pause")))
+        );
     }
 
     #[test]

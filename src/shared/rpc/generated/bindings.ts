@@ -49,6 +49,48 @@ export type EntryStatus = {
 	noticeVersion: string,
 };
 
+export type HubCompatibility = { kind: "catalog"; catalogId: string } | { kind: "candidate"; reason: string } | { kind: "browse-only"; reason: string };
+
+export type HubDetail = {
+	model: HubModel,
+	revision: string,
+	languages: string[],
+	files: HubFile[],
+	filesTruncated: boolean,
+	description: string | null,
+	readme: string | null,
+};
+
+export type HubFile = {
+	path: string,
+	bytes: string | null,
+};
+
+export type HubModel = {
+	repository: string,
+	task: string | null,
+	library: string | null,
+	downloads: string,
+	likes: string,
+	license: string | null,
+	updatedAt: string | null,
+	gated: boolean,
+	compatibility: HubCompatibility,
+	tags: string[],
+};
+
+export type HubPage = {
+	models: HubModel[],
+	nextCursor: string | null,
+};
+
+export type HubSearch = {
+	query: string,
+	task: string,
+	sort: string,
+	cursor: string | null,
+};
+
 export type InstallFile = {
 	path: string,
 	bytes: string,
@@ -89,6 +131,10 @@ export type JobStatus = "queued" | "running" | "cancelling" | "cancelled" | "com
  */
 export type JsonValue = "Null" | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
+export type LibraryMutation = {
+	pendingAudioDeletions: number,
+};
+
 export type LibraryQuery = {
 	collectionId: string | null,
 	query: string,
@@ -113,6 +159,8 @@ export type ModelRecord = {
 
 export type PlaybackState = {
 	renderId: string | null,
+	ambienceId: string | null,
+	previewAmbienceId: string | null,
 	playing: boolean,
 	positionMs: number,
 	durationMs: number,
@@ -136,6 +184,8 @@ export type Preferences = {
 	idleModelMinutes: number,
 };
 
+export type RecordingRemoval = { kind: "removed" } | { kind: "pending"; message: string };
+
 export type RenderPassage = {
 	blockIds: string[],
 	startMs: number,
@@ -150,6 +200,7 @@ export type RenderRecord = {
 	durationMs: number,
 	createdAt: string,
 	preview: boolean,
+	pipelineVersion?: number,
 	passages?: RenderPassage[],
 };
 
@@ -222,6 +273,13 @@ export type StorageInfo = {
 	backups: string[],
 };
 
+export type StoredRecording = {
+	render: RenderRecord,
+	scriptTitle: string,
+	scriptStatus: string,
+	pendingDeletion: boolean,
+};
+
 export type Suggestion = {
 	id: string,
 	scriptId: string,
@@ -252,9 +310,9 @@ export type Voice = {
 	name: string,
 	language: string,
 };
-const ARGS_MAP = {"entry":{"accept":["notice_version","acknowledged"],"exit":[],"status":[]},"generation":{"discard":["id"],"start":["request"],"suggestions":["script_id"]},"jobs":{"cancel":["id"],"changed":["snapshot"],"list":[],"snapshot":["id"]},"library":{"collections":[],"create_collection":["name"],"delete_collection":["id"],"rename_collection":["id","name"],"scripts":["query"]},"models":{"catalog":[],"install":["plan_id","job_id"],"link":["path","architecture","existing_id"],"list":[],"plan":["catalog_id"],"remove":["id"],"scan":["job_id"],"usage":["id"],"verify":["id","job_id"]},"narration":{"export":["render_id","path","ambience_id","job_id"],"plan":["script_id"],"render":["script_id","job_id","preview","block_ids"],"renders":["script_id"]},"playback":{"ambience":[],"control":["operation","value"],"import_ambience":["path"],"load":["render_id"],"select_ambience":["id"],"state":[]},"providers":{"connect":["key"],"connected":[],"disconnect":[],"refresh":[]},"scripts":{"bulk":["request"],"create":["collection_id"],"duplicate":["id"],"export_file":["id","path"],"export_many":["ids","directory","format","job_id"],"get":["id"],"import_file":["path","collection_id"],"legacy_document":["id"],"restore_revision":["id","revision"],"revisions":["id"],"save":["patch"]},"settings":{"cleanup":[],"get":[],"save":["preferences"],"storage":[]}};
+const ARGS_MAP = {"entry":{"accept":["notice_version","acknowledged"],"exit":[],"status":[]},"generation":{"discard":["id"],"start":["request"],"suggestions":["script_id"]},"jobs":{"cancel":["id"],"changed":["snapshot"],"list":[],"snapshot":["id"]},"library":{"collections":[],"create_collection":["name"],"delete_collection":["id"],"rename_collection":["id","name"],"scripts":["query"]},"models":{"catalog":[],"detail":["repository"],"install":["plan_id","job_id"],"link":["path","architecture","existing_id"],"list":[],"open_source":["url"],"plan":["catalog_id"],"remove":["id"],"scan":["job_id"],"search":["request"],"usage":["id"],"verify":["id","job_id"]},"narration":{"export":["render_id","path","ambience_id","job_id"],"library":[],"plan":["script_id"],"remove":["id"],"render":["script_id","job_id","preview","block_ids"],"renders":["script_id"]},"playback":{"ambience":[],"control":["operation","value"],"import_ambience":["path"],"load":["render_id"],"preview_ambience":["id"],"remove_ambience":["id"],"rename_ambience":["id","name"],"select_ambience":["id"],"state":[]},"providers":{"connect":["key"],"connected":[],"disconnect":[],"refresh":[]},"scripts":{"bulk":["request"],"create":["collection_id"],"duplicate":["id"],"export_file":["id","path"],"export_many":["ids","directory","format","job_id"],"get":["id"],"import_file":["path","collection_id"],"legacy_document":["id"],"restore_revision":["id","revision"],"revisions":["id"],"save":["patch"]},"settings":{"cleanup":[],"get":[],"save":["preferences"],"storage":[]}};
 
-const RESULT_MAP = {"entry":{"accept":true,"exit":false,"status":false},"generation":{"discard":true,"start":true,"suggestions":true},"jobs":{"cancel":true,"changed":false,"list":true,"snapshot":true},"library":{"collections":true,"create_collection":true,"delete_collection":true,"rename_collection":true,"scripts":true},"models":{"catalog":false,"install":true,"link":true,"list":true,"plan":true,"remove":true,"scan":true,"usage":true,"verify":true},"narration":{"export":true,"plan":true,"render":true,"renders":true},"playback":{"ambience":true,"control":true,"import_ambience":true,"load":true,"select_ambience":true,"state":true},"providers":{"connect":true,"connected":false,"disconnect":true,"refresh":true},"scripts":{"bulk":true,"create":true,"duplicate":true,"export_file":true,"export_many":true,"get":true,"import_file":true,"legacy_document":true,"restore_revision":true,"revisions":true,"save":true},"settings":{"cleanup":true,"get":true,"save":true,"storage":true}};
+const RESULT_MAP = {"entry":{"accept":true,"exit":false,"status":false},"generation":{"discard":true,"start":true,"suggestions":true},"jobs":{"cancel":true,"changed":false,"list":true,"snapshot":true},"library":{"collections":true,"create_collection":true,"delete_collection":true,"rename_collection":true,"scripts":true},"models":{"catalog":false,"detail":true,"install":true,"link":true,"list":true,"open_source":true,"plan":true,"remove":true,"scan":true,"search":true,"usage":true,"verify":true},"narration":{"export":true,"library":true,"plan":true,"remove":true,"render":true,"renders":true},"playback":{"ambience":true,"control":true,"import_ambience":true,"load":true,"preview_ambience":true,"remove_ambience":true,"rename_ambience":true,"select_ambience":true,"state":true},"providers":{"connect":true,"connected":false,"disconnect":true,"refresh":true},"scripts":{"bulk":true,"create":true,"duplicate":true,"export_file":true,"export_many":true,"get":true,"import_file":true,"legacy_document":true,"restore_revision":true,"revisions":true,"save":true},"settings":{"cleanup":true,"get":true,"save":true,"storage":true}};
 
 export type Router = {
 	entry: {
@@ -282,18 +340,23 @@ export type Router = {
 	},
 	models: {
 		catalog: () => Promise<CatalogEntry[]>,
+		detail: (repository: string) => Promise<TauRpcResult<HubDetail, AppError>>,
 		install: (planId: string, jobId: string) => Promise<TauRpcResult<string, AppError>>,
 		link: (path: string, architecture: string | null, existingId: string | null) => Promise<TauRpcResult<ModelRecord, AppError>>,
 		list: () => Promise<TauRpcResult<ModelRecord[], AppError>>,
+		open_source: (url: string) => Promise<TauRpcResult<null, AppError>>,
 		plan: (catalogId: string) => Promise<TauRpcResult<InstallPlan, AppError>>,
 		remove: (id: string) => Promise<TauRpcResult<null, AppError>>,
 		scan: (jobId: string) => Promise<TauRpcResult<string, AppError>>,
+		search: (request: HubSearch) => Promise<TauRpcResult<HubPage, AppError>>,
 		usage: (id: string) => Promise<TauRpcResult<ScriptSummary[], AppError>>,
 		verify: (id: string, jobId: string) => Promise<TauRpcResult<string, AppError>>,
 	},
 	narration: {
 		export: (renderId: string, path: string, ambienceId: string | null, jobId: string) => Promise<TauRpcResult<string, AppError>>,
+		library: () => Promise<TauRpcResult<StoredRecording[], AppError>>,
 		plan: (scriptId: string) => Promise<TauRpcResult<Unit[], AppError>>,
+		remove: (id: string) => Promise<TauRpcResult<RecordingRemoval, AppError>>,
 		render: (scriptId: string, jobId: string, preview: boolean, blockIds: string[] | null) => Promise<TauRpcResult<string, AppError>>,
 		renders: (scriptId: string) => Promise<TauRpcResult<RenderRecord[], AppError>>,
 	},
@@ -302,6 +365,9 @@ export type Router = {
 		control: (operation: string, value: number | null) => Promise<TauRpcResult<null, AppError>>,
 		import_ambience: (path: string) => Promise<TauRpcResult<Ambience, AppError>>,
 		load: (renderId: string) => Promise<TauRpcResult<null, AppError>>,
+		preview_ambience: (id: string | null) => Promise<TauRpcResult<null, AppError>>,
+		remove_ambience: (id: string) => Promise<TauRpcResult<null, AppError>>,
+		rename_ambience: (id: string, name: string) => Promise<TauRpcResult<null, AppError>>,
 		select_ambience: (id: string | null) => Promise<TauRpcResult<null, AppError>>,
 		state: () => Promise<TauRpcResult<PlaybackState, AppError>>,
 	},
@@ -312,7 +378,7 @@ export type Router = {
 		refresh: () => Promise<TauRpcResult<ModelRecord[], AppError>>,
 	},
 	scripts: {
-		bulk: (request: BulkRequest) => Promise<TauRpcResult<null, AppError>>,
+		bulk: (request: BulkRequest) => Promise<TauRpcResult<LibraryMutation, AppError>>,
 		create: (collectionId: string | null) => Promise<TauRpcResult<Script, AppError>>,
 		duplicate: (id: string) => Promise<TauRpcResult<Script, AppError>>,
 		export_file: (id: string, path: string) => Promise<TauRpcResult<null, AppError>>,

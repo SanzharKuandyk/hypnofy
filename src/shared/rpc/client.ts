@@ -8,6 +8,7 @@ import type {
   Preferences,
   ScriptPatch,
   JobSnapshot,
+  HubSearch,
 } from "./generated/bindings";
 
 const rpc = createTauRPCProxy();
@@ -90,6 +91,9 @@ export const api = {
     cleanup: () => request(() => rpc.settings.cleanup()),
   },
   models: {
+    openSource: (url: string) => request(() => rpc.models.open_source(url)),
+    search: (value: HubSearch) => request(() => rpc.models.search(value)),
+    detail: (repository: string) => request(() => rpc.models.detail(repository)),
     usage: (id: string) => request(() => rpc.models.usage(id)),
     list: () => request(() => rpc.models.list()),
     catalog: () => rpc.models.catalog(),
@@ -113,6 +117,8 @@ export const api = {
     discard: (id: string) => request(() => rpc.generation.discard(id)),
   },
   narration: {
+    library: () => request(() => rpc.narration.library()),
+    remove: (id: string) => request(() => rpc.narration.remove(id)),
     plan: (id: string) => request(() => rpc.narration.plan(id)),
     render: (id: string, jobId: string, preview = false, blockIds: string[] = []) =>
       request(() => rpc.narration.render(id, jobId, preview, blockIds)),
@@ -121,6 +127,10 @@ export const api = {
       request(() => rpc.narration.export(id, path, ambience, newJobId())),
   },
   playback: {
+    renameAmbience: (id: string, name: string) =>
+      request(() => rpc.playback.rename_ambience(id, name)),
+    removeAmbience: (id: string) => request(() => rpc.playback.remove_ambience(id)),
+    previewAmbience: (id: string | null) => request(() => rpc.playback.preview_ambience(id)),
     state: () => request(() => rpc.playback.state()),
     load: (id: string) => request(() => rpc.playback.load(id)),
     control: (operation: string, value: number | null = null) =>

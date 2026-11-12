@@ -3,6 +3,7 @@
   import type { HTMLInputAttributes } from "svelte/elements";
 
   interface Props extends Omit<HTMLInputAttributes, "value" | "oninput" | "onchange" | "type"> {
+    element?: HTMLInputElement | undefined;
     value?: string;
     type?: "text" | "password" | "search";
     oninput?: (value: string) => void;
@@ -10,6 +11,7 @@
   }
 
   let {
+    element = $bindable(),
     value = $bindable(""),
     type = "text",
     oninput,
@@ -22,6 +24,7 @@
 
 {#if type === "password"}<div class="password-field">
     <input
+      bind:this={element}
       {...rest}
       class={`control-input ${className}`}
       type={reveal ? "text" : "password"}
@@ -41,6 +44,7 @@
     >
   </div>
 {:else}<input
+    bind:this={element}
     {...rest}
     class={`control-input ${className}`}
     {type}

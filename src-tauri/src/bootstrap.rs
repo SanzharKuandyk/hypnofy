@@ -27,6 +27,7 @@ pub struct App {
     pub plans: Arc<Mutex<HashMap<String, InstallPlan>>>,
     pub test_mode: bool,
     pub downloads: Arc<tokio::sync::Semaphore>,
+    pub model_hub: crate::infrastructure::model_hub::ModelHub,
 }
 
 impl App {
@@ -65,6 +66,7 @@ impl App {
             test_mode: cfg!(debug_assertions)
                 && std::env::var_os("HYPNOFY_TEST_DATA_DIR").is_some(),
             downloads: Arc::new(tokio::sync::Semaphore::new(2)),
+            model_hub: crate::infrastructure::model_hub::ModelHub::new()?,
         })
     }
 

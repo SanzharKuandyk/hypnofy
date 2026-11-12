@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Pause, Square, Volume2, Clock, Download } from "@lucide/svelte";
+  import { Play, Pause, Square, Volume2, Clock, Download, X, Trash2 } from "@lucide/svelte";
   import { Button, Select, Slider } from "../../../shared/ui";
   import type { PlaybackState, RenderRecord } from "../../../domain";
 
@@ -9,12 +9,16 @@
     onplay,
     oncontrol,
     onexport,
+    onclose,
+    ondelete,
   }: {
     state: PlaybackState | null;
     render: Pick<RenderRecord, "id" | "durationMs"> | undefined;
     onplay: () => void;
     oncontrol: (operation: string, value?: number) => void;
     onexport: () => void;
+    onclose: () => void;
+    ondelete: () => void;
   } = $props();
 
   const loaded = $derived(!!render && state?.renderId === render.id);
@@ -43,6 +47,16 @@
       >{time(loaded ? (state?.positionMs ?? 0) : 0)} / {time(render?.durationMs ?? 0)}</span
     ><span class="render"
       ><Button disabled={!render} onclick={onexport}><Download size={15} />Export WAV</Button></span
+    >
+    <Button
+      variant="ghost"
+      class="icon player-delete"
+      aria-label="Delete recording"
+      disabled={!render}
+      onclick={ondelete}><Trash2 size={16} /></Button
+    >
+    <Button variant="ghost" class="icon" aria-label="Close player" onclick={onclose}
+      ><X size={17} /></Button
     >
   </div>
   <Slider

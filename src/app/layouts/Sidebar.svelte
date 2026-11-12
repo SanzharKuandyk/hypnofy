@@ -10,6 +10,7 @@
     Box,
     Settings,
     ShieldCheck,
+    Music2,
   } from "@lucide/svelte";
   import { Button, Input } from "../../shared/ui";
   import type { Workspace } from "../workflows/workspace.svelte";
@@ -98,6 +99,13 @@
       >{/each}
   </nav>
   <div class="sidebar-footer">
+    <Button
+      variant="ghost"
+      class={`nav-item${w.route.kind === "sounds" ? " active" : ""}`}
+      title="Sound library"
+      onclick={() => navigate({ kind: "sounds" })}
+      ><Music2 /><span class="label">Sound library</span></Button
+    >
     <Button
       variant="ghost"
       class={`nav-item${w.route.kind === "models" ? " active" : ""}`}

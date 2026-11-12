@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import { DropdownMenu } from "bits-ui";
   import {
     FileText,
     Folder,
@@ -13,6 +14,7 @@
     Upload,
     Download,
     Pencil,
+    MoreHorizontal,
   } from "@lucide/svelte";
   import { Button, Dialog, Field, Select, Input, Checkbox } from "../shared/ui";
   import { api } from "../shared/rpc/client";
@@ -21,6 +23,15 @@
 
   let { workspace: w, oncollection }: { workspace: Workspace; oncollection: () => void } = $props();
   let selected = $state<string[]>([]);
+  const visibleSelection = $derived(
+    w.scripts.filter((item) => selected.includes(item.id)).map((item) => item.id),
+  );
+  let actionIds = $state<string[]>([]);
+  let renameScriptOpen = $state(false);
+  let renameScriptId = $state("");
+  let scriptName = $state("");
+  let renameError = $state("");
+  let renamingScript = $state(false);
   let confirm = $state(false);
   let move = $state(false);
   let target = $state("inbox");
@@ -47,14 +58,33 @@
     selected = selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id];
   }
 
-  async function bulk(operation: string, collectionId: string | null = null): Promise<void> {
-    await w.bulk(selected, operation, collectionId);
+  async function bulk(
+    operation: string,
+    collectionId: string | null = null,
+    ids = visibleSelection,
+  ): Promise<void> {
+    await w.bulk(ids, operation, collectionId);
     selected = [];
     confirm = false;
     move = false;
   }
 
+  async function saveScriptName(): Promise<void> {
+    if (!scriptName.trim() || renamingScript) return;
+    renamingScript = true;
+    renameError = "";
+    try {
+      await w.renameScript(renameScriptId, scriptName);
+      renameScriptOpen = false;
+    } catch (value) {
+      renameError = value instanceof Error ? value.message : "Could not rename the script.";
+    } finally {
+      renamingScript = false;
+    }
+  }
+
   function search(): void {
+    selected = [];
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       w.query = localSearch;
@@ -126,22 +156,38 @@
               favorite: false,
               trash: true,
             });
-            selected = scripts.map((s) => s.id);
+            actionIds = scripts.map((s) => s.id);
             confirm = true;
           })}>Empty trash</Button
       >{:else}<Button onclick={() => w.action(() => w.importScript())}
         ><Upload size={15} />Import</Button
       >{/if}
   </div>
-  {#if selected.length}<div class="toolbar card">
-      <strong>{selected.length} selected</strong>{#if trash}<Button
+  {#if visibleSelection.length}<div
+      class="script-selection"
+      role="group"
+      aria-label="Selected script actions"
+    >
+      <strong>{visibleSelection.length} selected</strong>{#if trash}<Button
           onclick={() => w.action(() => bulk("restore"))}><RotateCcw size={15} />Restore</Button
-        ><Button variant="danger" onclick={() => (confirm = true)}>Delete permanently</Button
-        >{:else}<Button onclick={() => (move = true)}>Move</Button><Button
-          onclick={() => w.action(() => bulk("favorite"))}>Favorite</Button
-        ><Button onclick={() => (exportOpen = true)}>Export</Button><Button
+        ><Button
           variant="danger"
-          onclick={() => w.action(() => bulk("trash"))}>Move to Trash</Button
+          onclick={() => {
+            actionIds = visibleSelection;
+            confirm = true;
+          }}>Delete permanently</Button
+        >{:else}<Button
+          onclick={() => {
+            actionIds = visibleSelection;
+            move = true;
+          }}>Move</Button
+        ><Button onclick={() => w.action(() => bulk("favorite"))}>Favorite</Button><Button
+          onclick={() => {
+            actionIds = visibleSelection;
+            exportOpen = true;
+          }}>Export</Button
+        ><Button variant="danger" onclick={() => w.action(() => bulk("trash"))}
+          >Move to Trash</Button
         >{/if}<Button variant="ghost" onclick={() => (selected = [])}>Clear</Button>
     </div>{/if}
   {#if w.scripts.length}
@@ -201,31 +247,72 @@
                     class="icon"
                     aria-label="Permanently delete script"
                     onclick={() => {
-                      selected = [script.id];
+                      actionIds = [script.id];
                       confirm = true;
                     }}><Trash2 size={16} /></Button
-                  >{:else}<Button
-                    variant="ghost"
-                    class="icon optional"
-                    aria-label="Duplicate script"
-                    onclick={() =>
-                      w.action(async () => {
-                        const copy = await api.scripts.duplicate(script.id);
-                        await w.navigate({ kind: "script", id: copy.id });
-                      })}><Copy size={16} /></Button
-                  ><Button
-                    variant="ghost"
-                    class="icon optional"
-                    aria-label="Export script"
-                    onclick={() => w.action(() => w.exportScript(script.id, script.title))}
-                    ><Download size={16} /></Button
-                  ><Button
-                    variant="ghost"
-                    class="icon"
-                    aria-label="Move script to Trash"
-                    onclick={() => w.action(() => w.bulk([script.id], "trash"))}
-                    ><Trash2 size={16} /></Button
-                  >{/if}
+                  >{:else}
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger
+                      class="button ghost icon"
+                      aria-label={`Actions for ${script.title}`}
+                    >
+                      <MoreHorizontal size={18} />
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        class="script-actions-menu"
+                        align="end"
+                        sideOffset={6}
+                        collisionPadding={12}
+                      >
+                        <DropdownMenu.Item
+                          onSelect={() => {
+                            renameScriptId = script.id;
+                            scriptName = script.title;
+                            renameError = "";
+                            renameScriptOpen = true;
+                          }}><Pencil size={16} />Rename</DropdownMenu.Item
+                        >
+                        <DropdownMenu.Item
+                          onSelect={() => {
+                            target = script.collectionId;
+                            actionIds = [script.id];
+                            move = true;
+                          }}><Folder size={16} />Move to collection</DropdownMenu.Item
+                        >
+                        <DropdownMenu.Item
+                          onSelect={() =>
+                            w.action(() =>
+                              w.bulk([script.id], script.favorite ? "unfavorite" : "favorite"),
+                            )}
+                        >
+                          <Star size={16} />{script.favorite
+                            ? "Remove favorite"
+                            : "Add to favorites"}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          onSelect={() =>
+                            w.action(async () => {
+                              const copy = await api.scripts.duplicate(script.id);
+                              await w.navigate({ kind: "script", id: copy.id });
+                            })}><Copy size={16} />Duplicate</DropdownMenu.Item
+                        >
+                        <DropdownMenu.Item
+                          onSelect={() => w.action(() => w.exportScript(script.id, script.title))}
+                        >
+                          <Download size={16} />Export</DropdownMenu.Item
+                        >
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          class="danger-item"
+                          onSelect={() => w.action(() => w.bulk([script.id], "trash"))}
+                        >
+                          <Trash2 size={16} />Move to Trash
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                {/if}
               </div></td
             ></tr
           >{/each}
@@ -268,7 +355,7 @@
   ><div class="actions">
     <Button onclick={() => (confirm = false)}>Cancel</Button><Button
       variant="danger"
-      onclick={() => w.action(() => bulk("delete"))}>Delete permanently</Button
+      onclick={() => w.action(() => bulk("delete", null, actionIds))}>Delete permanently</Button
     >
   </div></Dialog
 >
@@ -283,10 +370,31 @@
   <div class="actions">
     <Button onclick={() => (move = false)}>Cancel</Button><Button
       variant="primary"
-      onclick={() => w.action(() => bulk("move", target))}>Move scripts</Button
+      onclick={() => w.action(() => bulk("move", target, actionIds))}>Move scripts</Button
     >
   </div></Dialog
 >
+<Dialog bind:open={renameScriptOpen} title="Rename script" required={renamingScript}>
+  <form
+    class="rename-script-form"
+    onsubmit={(event) => {
+      event.preventDefault();
+      void saveScriptName();
+    }}
+  >
+    <Field label="Name"
+      ><Input aria-label="Script name" bind:value={scriptName} disabled={renamingScript} /></Field
+    >
+    {#if renameError}<p class="inline-error" role="alert">{renameError}</p>{/if}
+    <div class="actions">
+      <Button disabled={renamingScript} onclick={() => (renameScriptOpen = false)}>Cancel</Button>
+      <Button variant="primary" type="submit" loading={renamingScript} disabled={!scriptName.trim()}
+        >Save name</Button
+      >
+    </div>
+  </form>
+</Dialog>
+
 <Dialog bind:open={rename} title="Rename collection"
   ><Field label="Name"><Input aria-label="Collection name" bind:value={collectionName} /></Field>
   <div class="actions">
@@ -342,7 +450,7 @@
           await w.editor.flush();
           const folder = await chooseExportFolder();
           if (folder) {
-            await api.scripts.exportMany(selected, folder, exportFormat);
+            await api.scripts.exportMany(actionIds, folder, exportFormat);
             exportOpen = false;
             selected = [];
             w.notify("Script export started");
